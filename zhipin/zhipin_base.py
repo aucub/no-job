@@ -6,6 +6,7 @@ import httpx
 import datetime
 import arrow
 import peewee
+from urllib.parse import parse_qs, urlparse
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 from typing import Callable, Dict, List, Optional, Tuple
@@ -55,7 +56,12 @@ class ZhiPinBase:
             format="<green>{time:YYYY-MM-DD at HH:mm:ss}</green> | <level>{message}</level>",
         )
         logger.add(
-            "out.log", retention="1 days", enqueue=True, backtrace=True, diagnose=True
+            "out.log",
+            retention="1 days",
+            rotation="1 MB",
+            enqueue=True,
+            backtrace=True,
+            diagnose=True,
         )
         self.check_network()
         self.wheels = self.load_state()
@@ -302,6 +308,11 @@ class ZhiPinBase:
         """从 URL 中提取 encryptJobId"""
         match = re.search(r"/job_detail/([^/]+)\.html", url)
         return match.group(1) if match else ""
+
+    def get_securityId(self, url: str) -> str:
+        """从 URL 中提取 securityId"""
+        query_params = parse_qs(urlparse(url).query)
+        return query_params.get("securityId", [""])[0]
 
     def check_block_list(self, data: dict) -> Optional[str]:
         """检查字典中的值是否在相应的块列表中"""
