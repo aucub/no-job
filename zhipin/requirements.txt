@@ -6,7 +6,7 @@ toml
 attrs
 loguru
 python-dotenv
-numpy == 1.26.4
+numpy<2
 opencv-python
 portkey-ai
 langdetect

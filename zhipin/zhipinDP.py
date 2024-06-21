@@ -10,7 +10,6 @@ import time
 import cv2
 import arrow
 from collections.abc import Iterable
-from urllib.parse import parse_qs, urlparse
 from captcha import cracker
 from zhipin_base import ZhiPinBase, VerifyException
 from httpx import HTTPError
@@ -337,6 +336,9 @@ class ZhiPinDP(ZhiPinBase):
         self.page.ele(".geetest_item_wrap").get_screenshot(
             path=captcha_image_path, name="img_image.png"
         )
+        if not (element.states.is_displayed and element.states.has_rect):
+            self.page.ele("css:.btn").click()
+            time.sleep(random.uniform(self.config.sleep, self.config.small_sleep))
         (element_width, element_height) = element.rect.size
         image = cv2.imread(captcha_image_path + "/" + "img_image.png")
         height, width, _ = image.shape
@@ -388,9 +390,7 @@ class ZhiPinDP(ZhiPinBase):
             self.dp_detail(url)
 
     def detail(self, url):
-        query_params = parse_qs(urlparse(url).query)
-        security_id = query_params.get("securityId", [""])[0]
-        self.page.get(self.URL16 + security_id)
+        self.page.get(self.URL16 + self.get_securityId(url))
         return self.parse_detail(self.page.ele("tag:pre").text)
 
     def dp_detail(self, url):
@@ -452,7 +452,9 @@ class ZhiPinDP(ZhiPinBase):
         elif "异常" in element.text:
             raise ElementNotFoundError()
         description = self.page.ele(".job-sec-text").text
-        self.page.ele("css:btn btn-startchat").click()
+        element = self.page.ele("css:btn btn-startchat")
+        redirect_url = element.property("redirect-url")
+        element.click()
         chat_box = False
         try:
             self.page.wait.eles_loaded(
@@ -471,6 +473,8 @@ class ZhiPinDP(ZhiPinBase):
         if chat_box and self.config.llm_chat:
             try:
                 greet = self.llm.default_greet
+                if "chat" in self.page.url and redirect_url:
+                    self.page.get(redirect_url)
                 if self.config.llm_chat:
                     greet = self.llm.generate_greet(jd)
                 self.send_greet_to_chat_box(greet)
