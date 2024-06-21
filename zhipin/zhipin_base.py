@@ -14,6 +14,7 @@ from jd import JD, Level, jobType
 from config import load_config
 from dotenv import load_dotenv
 from ai import LLM
+from langdetect import detect
 
 load_dotenv()
 
@@ -345,6 +346,8 @@ class ZhiPinBase:
 
     def check_description(self, description_text: str) -> bool:
         """检查职位描述"""
+        if detect(description_text) != "zh-cn":
+            return False
         if len(description_text) < self.config.description_min:
             return False
         description_text = description_text.lower()
