@@ -145,9 +145,17 @@ class ZhiPinDP(ZhiPinBase):
         """
         检查网络
         """
-        self.page.get(self.URL14)
-        if "直聘" not in self.page.title:
-            sys.exit("网络不可用")
+        self.page.get(self.URL1)
+        try:
+            self.page.wait.eles_loaded(
+                locators=[
+                    ".job-card-wrapper",
+                ],
+                any_one=True,
+            )
+        except ElementNotFoundError as e:
+            self.handle_exception(e)
+            self.check_verify()
 
     def test_query(self):
         self.iterate_query_parameters()
