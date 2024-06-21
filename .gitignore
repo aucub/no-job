@@ -12,7 +12,6 @@ archived_logs
 reports/*.xml
 saved_cookies
 *.pkl
-*.txt
 *.json
 *.xml
 *.lock
@@ -24,3 +23,4 @@ saved_cookies
 *.jsonl
 *.log
 zpgeek_job
+resume.txt
