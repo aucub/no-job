@@ -264,7 +264,7 @@ class ZhiPinBase:
             jd.checked_time = arrow.Arrow.now().datetime
             try:
                 n = jd.save(force_insert=False)
-                if not n:
+                if n == 0:
                     jd.save(force_insert=True)
             except (
                 peewee.OperationalError,
@@ -272,6 +272,7 @@ class ZhiPinBase:
                 peewee.InterfaceError,
             ) as e:
                 self.handle_exception(e)
+                JD.Meta.database.connect(reuse_if_open=True)
             print(jd.__data__)
 
     def get_jd(self, id) -> JD:
