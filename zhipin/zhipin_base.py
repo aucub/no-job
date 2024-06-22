@@ -58,7 +58,6 @@ class ZhiPinBase:
         logger.add(
             "out.log",
             retention="1 days",
-            rotation="1 MB",
             enqueue=True,
             backtrace=True,
             diagnose=True,
@@ -279,7 +278,7 @@ class ZhiPinBase:
                 peewee.InterfaceError,
             ) as e:
                 self.handle_exception(e)
-                JD._meta.database.connect(reuse_if_open=True)
+                JD.reconnect()
             print(jd.__data__)
 
     def get_jd(self, id) -> JD:
@@ -288,6 +287,7 @@ class ZhiPinBase:
             return jd or JD()
         except (peewee.OperationalError, peewee.InterfaceError) as e:
             self.handle_exception(e)
+            JD.reconnect()
         return JD()
 
     def get_jd_url_list(self, level: str) -> list[str]:
