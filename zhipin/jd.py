@@ -1,4 +1,5 @@
 import os
+import time
 from enum import Enum
 from urllib.parse import parse_qs, urlparse
 from peewee import (
@@ -82,6 +83,11 @@ class JD(Model):
 
     class Meta:
         database = db
+
+    def reconnect():
+        JD._meta.database.close()
+        time.sleep(2)
+        JD._meta.database.connect(reuse_if_open=True)
 
 
 class Level(Enum):
