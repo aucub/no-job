@@ -279,7 +279,7 @@ class ZhiPinBase:
                 peewee.InterfaceError,
             ) as e:
                 self.handle_exception(e)
-                JD.Meta.database.connect(reuse_if_open=True)
+                JD._meta.database.connect(reuse_if_open=True)
             print(jd.__data__)
 
     def get_jd(self, id) -> JD:

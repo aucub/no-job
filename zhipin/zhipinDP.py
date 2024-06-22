@@ -192,15 +192,15 @@ class ZhiPinDP(ZhiPinBase):
             + self.URL3
             + str(page)
         )
-        datas = self.page.listen.wait(
+        data_list = self.page.listen.wait(
             timeout=self.config.large_sleep, fit_count=False, raise_err=False
         )
         url_list = []
-        if datas:
-            if not isinstance(datas, Iterable):
-                datas = [datas]
+        if data_list:
+            if not isinstance(data_list, Iterable):
+                data_list = [data_list]
             try:
-                for data in datas:
+                for data in data_list:
                     if not data.is_failed:
                         if data.response.status == 200:
                             url_list.extend(self.parse_joblist(data.response.raw_body))
@@ -453,7 +453,7 @@ class ZhiPinDP(ZhiPinBase):
             raise ElementNotFoundError()
         description = self.page.ele(".job-sec-text").text
         element = self.page.ele("css:btn btn-startchat")
-        redirect_url = element.property("redirect-url")
+        redirect_url = element.attr("redirect-url")
         element.click()
         chat_box = False
         try:
@@ -473,8 +473,8 @@ class ZhiPinDP(ZhiPinBase):
         if chat_box and self.config.llm_chat:
             try:
                 greet = self.llm.default_greet
-                if "chat" in self.page.url and redirect_url:
-                    self.page.get(redirect_url)
+                if "chat" not in self.page.url and redirect_url:
+                    self.page.get(f"{self.URL14[:-1]}{redirect_url}")
                 if self.config.llm_chat:
                     greet = self.llm.generate_greet(jd)
                 self.send_greet_to_chat_box(greet)
