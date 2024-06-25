@@ -9,7 +9,6 @@ import atexit
 import time
 import cv2
 import arrow
-from collections.abc import Iterable
 from captcha import cracker
 from zhipin_base import ZhiPinBase, VerifyException
 from httpx import HTTPError
@@ -17,6 +16,7 @@ from jd import JD, Level
 from DrissionPage import ChromiumPage, ChromiumOptions
 from DrissionPage.common import Settings, wait_until
 from DrissionPage.errors import ElementNotFoundError, NoRectError, ElementLostError
+from collections.abc import Iterable
 from json.decoder import JSONDecodeError
 
 Settings.raise_when_ele_not_found = True
@@ -231,6 +231,8 @@ class ZhiPinDP(ZhiPinBase):
                 jd = JD()
                 job_info_html = element.ele(".:job-info clearfix").inner_html
                 jd.communicated = not self.contactable(job_info_html)
+                if jd.communicated:
+                    continue
                 url = element.ele("css:.job-card-left").property("href")
                 jd.id = self.get_encryptJobId(url)
                 row = self.get_jd(id)

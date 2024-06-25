@@ -6,9 +6,6 @@ import httpx
 import datetime
 import arrow
 import peewee
-from urllib.parse import parse_qs, urlparse
-from pymongo.mongo_client import MongoClient
-from pymongo.server_api import ServerApi
 from typing import Callable, Dict, List, Optional, Tuple
 from loguru import logger
 from jd import JD, Level, jobType
@@ -16,6 +13,9 @@ from config import load_config
 from dotenv import load_dotenv
 from ai import LLM
 from langdetect import detect
+from urllib.parse import parse_qs, urlparse
+from pymongo.mongo_client import MongoClient
+from pymongo.server_api import ServerApi
 
 load_dotenv()
 
@@ -119,6 +119,8 @@ class ZhiPinBase:
             jd = JD()
             jd.id = job.get("encryptJobId")
             jd.communicated = not job.get("contact", True)
+            if jd.communicated:
+                continue
             row = self.get_jd(jd.id)
             if row and row.id == jd.id:
                 if (
