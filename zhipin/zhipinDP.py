@@ -13,7 +13,7 @@ from captcha import cracker
 from zhipin_base import ZhiPinBase, VerifyException
 from httpx import HTTPError
 from jd import JD, Level
-from DrissionPage import ChromiumPage, ChromiumOptions
+from DrissionPage import ChromiumPage, ChromiumOptions, SessionOptions, WebPage
 from DrissionPage.common import Settings, wait_until
 from DrissionPage.errors import ElementNotFoundError, NoRectError, ElementLostError
 from collections.abc import Iterable
@@ -91,6 +91,11 @@ class ZhiPinDP(ZhiPinBase):
             )
             .incognito()
         )
+        self.so = (
+            SessionOptions(read_file=False)
+            .set_timeout(self.config.timeout)
+            .set_retry(self.config.max_retries)
+        )
         if hasattr(self.args, "communicate") and self.args.communicate:
             self.config.query_token = True
             self.config.always_token = True
@@ -103,13 +108,16 @@ class ZhiPinDP(ZhiPinBase):
             )
             self.switch_page(True)
             self.page.set.auto_handle_alert(accept=False, all_tabs=True)
+            if self.config.always_token:
+                self.page.clear_cache(cookies=False)
             self.login()
             time.sleep(self.config.small_sleep)
             self.check_dialog()
         if not self.config.always_token:
             if self.proxy:
                 self.co.set_proxy(self.proxy)
-            self.original_page = ChromiumPage(self.co, timeout=self.config.timeout)
+                self.so.set_proxies(self.proxy, self.proxy)
+            self.original_page = WebPage("d", self.config.timeout, self.co, self.so)
             self.switch_page(False)
             self.page.set.auto_handle_alert(accept=False, all_tabs=True)
             self.check_network_DP()
@@ -135,7 +143,11 @@ class ZhiPinDP(ZhiPinBase):
             self.page = self.original_page
 
     def cleanup_DP(self):
-        if hasattr(self, "original_page") and self.original_page:
+        if (
+            hasattr(self, "original_page")
+            and self.original_page
+            and hasattr(self.original_page, "quit")
+        ):
             self.original_page.quit()
         if hasattr(self, "cookies_page") and self.cookies_page:
             self.cookies_page.quit()
@@ -333,10 +345,10 @@ class ZhiPinDP(ZhiPinBase):
         self.page.wait.ele_displayed("text:依次")
         element = self.page.ele(".geetest_item_wrap")
         self.page.ele(".geetest_tip_img").get_screenshot(
-            path=captcha_image_path, name="tip_image.png"
+            path=captcha_image_path, name="tip_image.png", scroll_to_center=False
         )
         self.page.ele(".geetest_item_wrap").get_screenshot(
-            path=captcha_image_path, name="img_image.png"
+            path=captcha_image_path, name="img_image.png", scroll_to_center=False
         )
         if not (element.states.is_displayed and element.states.has_rect):
             self.page.ele("css:.btn").click()
@@ -382,18 +394,27 @@ class ZhiPinDP(ZhiPinBase):
             self.handle_exception(e)
         return True
 
+    def change_page_mode(self, mode: str):
+        if hasattr(self.page, "mode") and self.page.mode != mode:
+            self.page.change_mode(mode, False, False)
+
     def detail_list(self, url_list):
         for url in url_list:
             try:
+                self.change_page_mode("s")
                 if not self.detail(url):
                     continue
             except (JSONDecodeError, VerifyException, ElementNotFoundError) as e:
                 self.handle_exception(e)
+            self.change_page_mode("d")
             self.dp_detail(url)
 
     def detail(self, url):
-        self.page.get(self.URL16 + self.get_securityId(url))
-        return self.parse_detail(self.page.ele("tag:pre").text)
+        self.page.get(
+            self.URL16 + self.get_securityId(url),
+            proxies={"http": self.proxy, "https": self.proxy},
+        )
+        return self.parse_detail(self.page.raw_data)
 
     def dp_detail(self, url):
         jd = self.get_jd(self.get_encryptJobId(url))
