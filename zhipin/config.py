@@ -53,6 +53,7 @@ class Config:
     scale_block_list: List = ["-20"]  # 规模阻止名单
     degree_block_list: List = ["硕", "博"]  # 学历阻止名单
     experience_block_list: List = []  # 经验阻止名单
+    position_block_list: List = []
     location_block_list: List = []
 
     @property
