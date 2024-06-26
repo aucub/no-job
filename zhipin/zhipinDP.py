@@ -457,6 +457,8 @@ class ZhiPinDP(ZhiPinBase):
     def start_chat(self, url: str):
         self.page.get(url)
         jd = self.get_jd(self.get_encryptJobId(url))
+        if not self.check_communicate(jd):
+            return
         self.page.wait.eles_loaded(
             locators=[".btn btn-more", ".btn btn-startchat", ".error-content"],
             any_one=True,

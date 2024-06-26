@@ -304,9 +304,9 @@ class ZhiPinBase:
 
     def get_jd_url_list(self, level: str) -> list[str]:
         """获取指定 level 的 JD URL 列表"""
-        row_list = [
-            row
-            for row in JD.select().where(
+        return [
+            row.url
+            for row in JD.select(JD.url).where(
                 (JD.communicated == False)  # noqa: E712
                 & (
                     (JD._failed_fields.is_null())
@@ -315,16 +315,17 @@ class ZhiPinBase:
                 & (JD.level == level)
             )
         ]
-        url_list = []
-        for row in row_list:
-            if self.check_boss_id(row) and self.llm.check_jd(
-                self.config.llm_check_prompt, row
-            ):
-                url_list.append(row.url)
-            else:
-                row.communicated = True
-                self.save_jd(row)
-        return url_list
+
+    def check_communicate(self, jd: JD) -> bool:
+        result = self.check_boss_id(jd)
+        if result and self.config.llm_check:
+            result = result and self.llm.check_jd(self.config.llm_check_prompt, jd)
+        if result:
+            return True
+        else:
+            jd.communicated = True
+            self.save_jd(jd)
+            return False
 
     def get_encryptJobId(self, url: str) -> str:
         """从 URL 中提取 encryptJobId"""
