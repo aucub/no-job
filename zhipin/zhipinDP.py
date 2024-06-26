@@ -44,7 +44,7 @@ class ZhiPinDP(ZhiPinBase):
             .set_timeouts(self.config.timeout)
             .set_retry(self.config.max_retries)
             .headless(self.headless)
-            .set_paths(user_data_path=user_cache_directory + "chromium-temp-cookies")
+            .set_paths(user_data_path=user_cache_directory + "chromium-temp-cookies1")
             .set_pref("credentials_enable_service", False)
             .set_pref("enable_do_not_track", True)
             .set_pref("webrtc.ip_handling_policy", "disable_non_proxied_udp")
@@ -491,6 +491,8 @@ class ZhiPinDP(ZhiPinBase):
         except ElementNotFoundError as e:
             self.handle_exception(e)
             return
+        if "已达上限" in find_element.text:
+            sys.exit("已达上限")
         jd.communicated = True
         self.save_jd(jd)
         jd.description = description
@@ -506,8 +508,6 @@ class ZhiPinDP(ZhiPinBase):
             except ElementNotFoundError as e:
                 self.handle_exception(e)
             return
-        if "已达上限" in find_element.text:
-            sys.exit("已达上限")
         time.sleep(self.config.sleep)
         self.check_dialog()
 

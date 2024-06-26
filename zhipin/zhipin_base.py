@@ -251,6 +251,7 @@ class ZhiPinBase:
                 "experience",
                 "degree",
                 "boss_title",
+                "position",
             ],
         }
         failed_fields = set()

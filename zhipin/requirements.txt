@@ -1,7 +1,7 @@
 httpx
 peewee
 PyMySQL[rsa]
-pymongo[srv]
+pymongo
 toml
 attrs
 loguru
