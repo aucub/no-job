@@ -48,6 +48,7 @@ class ZhiPinBase:
     mongo_client = MongoClient(host=mongo_url, server_api=ServerApi("1"))
     mongo = mongo_client["zpgeek_job"]
     proxy = os.getenv("PROXY") or os.getenv("HTTP_PROXY") or None
+    proxies = {"http": proxy, "https": proxy}
 
     def __init__(self):
         logger.add(
@@ -66,9 +67,10 @@ class ZhiPinBase:
         self.wheels = self.load_state()
         if os.environ.get("CI"):
             self.config.llm_chat = False
+            self.config.llm_check = False
             self.config.query_token = False
             self.config.always_token = False
-        if self.config.llm_chat:
+        if self.config.llm_chat or self.config.llm_check:
             self.llm = LLM()
 
     def check_network(self):
@@ -229,6 +231,7 @@ class ZhiPinBase:
                 ("offline", lambda jd: self.check_offline(jd.description, jd.city)),
                 ("fund", lambda jd: self.check_fund(jd.fund)),
                 ("communicated", lambda jd: not jd.communicated),
+                ("boss_id", lambda jd: self.check_boss_id(jd)),
             ],
         }
         block_list_fields = {
@@ -292,11 +295,18 @@ class ZhiPinBase:
             JD.reconnect()
         return JD()
 
+    def check_boss_id(self, jd: JD) -> bool:
+        return not (
+            JD.select()
+            .where((JD.boss_id == jd.boss_id) & (JD.communicated == True))  # noqa: E712
+            .exists()
+        )
+
     def get_jd_url_list(self, level: str) -> list[str]:
         """获取指定 level 的 JD URL 列表"""
         row_list = [
             row
-            for row in JD.select(JD.boss_id, JD.url).where(
+            for row in JD.select().where(
                 (JD.communicated == False)  # noqa: E712
                 & (
                     (JD._failed_fields.is_null())
@@ -307,12 +317,13 @@ class ZhiPinBase:
         ]
         url_list = []
         for row in row_list:
-            if (
-                not JD.select()
-                .where((JD.boss_id == row.boss_id) & (JD.communicated == True))  # noqa: E712
-                .exists()
+            if self.check_boss_id(row) and self.llm.check_jd(
+                self.config.llm_check_prompt, row
             ):
                 url_list.append(row.url)
+            else:
+                row.communicated = True
+                self.save_jd(row)
         return url_list
 
     def get_encryptJobId(self, url: str) -> str:

@@ -25,7 +25,9 @@ class Config:
     max_retries: int = 3
     llm_chat: bool = False
     skip_known: bool = False
-    graduate: int = 0
+    llm_check: bool = False
+    llm_check_prompt: str = "我希望你充当求职者的招聘信息检查助手，你将检查职位描述的质量。请仅提供“true”或“false结果，无需解释。"
+    resume: str = ""
     salary_max: int = 10
     position_block_list: List = []
     active_block_list: List = [

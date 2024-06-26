@@ -412,7 +412,7 @@ class ZhiPinDP(ZhiPinBase):
     def detail(self, url):
         self.page.get(
             self.URL16 + self.get_securityId(url),
-            proxies={"http": self.proxy, "https": self.proxy},
+            proxies=self.proxies,
         )
         return self.parse_detail(self.page.raw_data)
 
@@ -499,7 +499,7 @@ class ZhiPinDP(ZhiPinBase):
                 if "chat" not in self.page.url and redirect_url:
                     self.page.get(f"{self.URL14[:-1]}{redirect_url}")
                 if self.config.llm_chat:
-                    greet = self.llm.generate_greet(jd)
+                    greet = self.llm.generate_greet(self.config.resume, jd)
                 self.send_greet_to_chat_box(greet)
             except ElementNotFoundError as e:
                 self.handle_exception(e)

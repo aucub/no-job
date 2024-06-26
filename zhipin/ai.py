@@ -44,9 +44,21 @@ class LLM:
             logger.error(f"HTTP error: {e}")
         return None
 
-    def generate_greet(self, jd: JD):
-        with open("resume.txt", "r", encoding="utf-8") as file:
-            context = file.read()
+    @logger.catch
+    def check_jd(self, base_prompt: str, jd: JD):
+        prompt = (
+            base_prompt + "\n职位名称：" + jd.name + "\n职位描述：" + jd.description
+        )
+        if jd.skill:
+            prompt += "\n要求技能：" + str(jd.skill)
+        if jd.company_introduce:
+            prompt += "\n公司介绍：" + jd.company_introduce
+        result = self.send(prompt)
+        if result and isinstance(result, str):
+            return "true" in result.lower()
+        return True
+
+    def generate_greet(self, resume: str, jd: JD):
         prompt = f"""
         你正在作为求职者申请一个职位，请根据提供的简历和职位描述，撰写一条不超过180字的求职消息。需清晰、专业地描述你的优势。注意事项如下：
         1. 这是一条求职消息，不需要邮件格式。使用纯文本，不使用Markdown等标记语言，避免空行和换行。不得使用“*”等符号表示强调。
@@ -64,7 +76,7 @@ class LLM:
         13. 吸引招聘者注意是第一目标，若有必要为此目标可以添加虚假/未知个人经历或能力。
         职位名称: {jd.name}
         职位描述: {jd.description}
-        简历内容: {context}
+        简历内容: {resume}
         """
         greet = self.send(prompt)
         if greet:
