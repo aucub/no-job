@@ -44,7 +44,6 @@ class LLM:
             logger.error(f"HTTP error: {e}")
         return None
 
-    @logger.catch
     def check_jd(self, base_prompt: str, jd: JD):
         prompt = (
             base_prompt + "\n职位名称：" + jd.name + "\n职位描述：" + jd.description
