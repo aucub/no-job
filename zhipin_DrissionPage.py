@@ -15,14 +15,19 @@ from httpx import HTTPError
 from jd import JD, Level
 from DrissionPage import ChromiumPage, ChromiumOptions, SessionOptions, WebPage
 from DrissionPage.common import Settings, wait_until
-from DrissionPage.errors import ElementNotFoundError, NoRectError, ElementLostError
+from DrissionPage.errors import (
+    ElementNotFoundError,
+    NoRectError,
+    ElementLostError,
+    WaitTimeoutError,
+)
 from collections.abc import Iterable
 from json.decoder import JSONDecodeError
 
 Settings.raise_when_ele_not_found = True
 
 
-class ZhiPinDP(ZhiPinBase):
+class ZhiPinDrissionPage(ZhiPinBase):
     def find_free_port(self) -> int:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.bind(("", 0))
@@ -44,7 +49,7 @@ class ZhiPinDP(ZhiPinBase):
             .set_timeouts(self.config.timeout)
             .set_retry(self.config.max_retries)
             .headless(self.headless)
-            .set_paths(user_data_path=user_cache_directory + "chromium-temp-cookies1")
+            .set_paths(user_data_path=user_cache_directory + "chromium-temp-cookies")
             .set_pref("credentials_enable_service", False)
             .set_pref("enable_do_not_track", True)
             .set_pref("webrtc.ip_handling_policy", "disable_non_proxied_udp")
@@ -163,8 +168,9 @@ class ZhiPinDP(ZhiPinBase):
                     ".job-card-wrapper",
                 ],
                 any_one=True,
+                raise_err=True,
             )
-        except ElementNotFoundError as e:
+        except (ElementNotFoundError, WaitTimeoutError) as e:
             self.handle_exception(e)
             self.check_verify()
 
@@ -224,9 +230,6 @@ class ZhiPinDP(ZhiPinBase):
         if len(url_list) > 0:
             return url_list
         try:
-            self.page.wait.eles_loaded(
-                locators=[".job-card-wrapper", ".job-empty-wrapper"], any_one=True
-            )
             element_list = self.page.eles(
                 "@|class=job-card-wrapper@|class=job-empty-wrapper"
             )
@@ -311,6 +314,7 @@ class ZhiPinDP(ZhiPinBase):
                         "css:.btn",
                     ],
                     any_one=True,
+                    raise_err=True,
                 )
                 current_url = self.page.url
                 if "safe/verify-slider" not in current_url:
@@ -322,14 +326,19 @@ class ZhiPinDP(ZhiPinBase):
                 cv2.error,
                 NoRectError,
                 ElementLostError,
+                WaitTimeoutError,
             ) as e:
                 self.handle_exception(e)
         if "403.html" in current_url or "error.html" in current_url:
+            self.page.get_screenshot(path="tmp", name="error.jpg", full_page=True)
             sys.exit("403或错误")
         if "job_detail" in current_url:
             try:
                 error_text = self.page.ele(".error-content").text
                 if "无法继续" in error_text:
+                    self.page.get_screenshot(
+                        path="tmp", name="error.jpg", full_page=True
+                    )
                     sys.exit("403或错误")
             except ElementNotFoundError as e:
                 self.handle_exception(e)
@@ -459,10 +468,6 @@ class ZhiPinDP(ZhiPinBase):
         jd = self.get_jd(self.get_encryptJobId(url))
         if not self.check_communicate(jd):
             return
-        self.page.wait.eles_loaded(
-            locators=[".btn btn-more", ".btn btn-startchat", ".error-content"],
-            any_one=True,
-        )
         element = self.page.ele(
             "@|class=btn btn-more@|class=btn btn-startchat@|class=error-content"
         )
@@ -482,9 +487,6 @@ class ZhiPinDP(ZhiPinBase):
         element.click()
         chat_box = False
         try:
-            self.page.wait.eles_loaded(
-                locators=[".dialog-con", "css:#chat-input"], any_one=True
-            )
             find_element = self.page.ele("@|class=dialog-con@|class=chat-input")
             if "chat" in self.page.url or "发送" in find_element.text:
                 chat_box = True
@@ -555,7 +557,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--headless", action="store_true", help="Enable headless option"
     )
-    zpDP = ZhiPinDP(args=parser.parse_args())
+    zpDP = ZhiPinDrissionPage(args=parser.parse_args())
     if zpDP.args.communicate:
         zpDP.test_communicate()
     else:

@@ -28,7 +28,7 @@ class Config:
     llm_check: bool = False
     llm_check_prompt: str = "我希望你充当求职者的招聘信息检查助手，你将检查职位描述的质量。请仅提供“true”或“false结果，无需解释。"
     resume: str = ""
-    salary_max: int = 10
+    salary_max: int = 8
     position_block_list: List = []
     active_block_list: List = [
         "半年",
@@ -75,7 +75,7 @@ class Config:
     update_furthest: int = 7776000  # 最旧更新时间
     offline_interview: bool = True  # 线下检查
     offline_city_list: List = []  # 线下城市
-    description_min: int = 35  # 最短描述
+    description_min: int = 40  # 最短描述
     description_necessary_list: List = []  # 描述必备词
     description_block_list: List = []  # 描述阻止名单
     skill_block_list: List = []
@@ -122,6 +122,14 @@ class Config:
         "10000人以上",
     ]
     salary_list_ui: List = ["3-5K", "5-10K"]
+    """
+    zhaopin
+    """
+    query_city_list_zhaopin: List = [
+        "653",
+    ]
+    query_we_zhaopin: List = ["0000", "0001"]
+    query_sl_zhaopin: str = "0000-8000"
 
 
 def save_config(config: Config) -> None:

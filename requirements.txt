@@ -1,3 +1,4 @@
+requests
 httpx
 peewee
 PyMySQL[rsa]

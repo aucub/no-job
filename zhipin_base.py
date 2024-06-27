@@ -6,29 +6,16 @@ import httpx
 import datetime
 import arrow
 import peewee
-from typing import Callable, Dict, List, Optional, Tuple
-from loguru import logger
+from typing import Callable, Dict, List, Tuple
 from jd import JD, Level, jobType
-from config import load_config
-from dotenv import load_dotenv
+from base import Base, VerifyException
 from ai import LLM
 from langdetect import detect
 from urllib.parse import parse_qs, urlparse
-from pymongo.mongo_client import MongoClient
-from pymongo.server_api import ServerApi
-
-load_dotenv()
 
 
-class VerifyException(Exception):
-    def __init__(self, message=None):
-        self.message = message
-
-
-class ZhiPinBase:
-    config = load_config()
+class ZhiPinBase(Base):
     URL1 = "https://www.zhipin.com/web/geek/job?query="
-    URL2 = config.query_param + "&salary="
     URL3 = "&page="
     URL4 = "https://www.zhipin.com/wapi/zpgeek/job/card.json?securityId="
     URL5 = "&lid="
@@ -43,38 +30,24 @@ class ZhiPinBase:
     URL14 = "https://www.zhipin.com/"
     URL15 = "https://www.zhipin.com/web/user/?ka=header-login"
     URL16 = "https://www.zhipin.com/wapi/zpgeek/job/detail.json?securityId="
-    page_count = None
-    mongo_url = os.getenv("MONGO_URL")
-    mongo_client = MongoClient(host=mongo_url, server_api=ServerApi("1"))
-    mongo = mongo_client["zpgeek_job"]
-    proxy = os.getenv("PROXY") or os.getenv("HTTP_PROXY") or None
-    proxies = {"http": proxy, "https": proxy}
 
     def __init__(self):
-        logger.add(
-            sys.stdout,
-            colorize=True,
-            format="<green>{time:YYYY-MM-DD at HH:mm:ss}</green> | <level>{message}</level>",
-        )
-        logger.add(
-            "out.log",
-            retention="1 days",
-            enqueue=True,
-            backtrace=True,
-            diagnose=True,
-        )
+        Base.__init__(self)
+        self.URL2 = self.config.query_param + "&salary="
+        self.mongo = self.mongo_client["zpgeek_job"]
         self.check_network()
         self.wheels = self.load_state()
         if os.environ.get("CI"):
             self.config.llm_chat = False
-            self.config.llm_check = False
-            self.config.query_token = False
-            self.config.always_token = False
         if self.config.llm_chat or self.config.llm_check:
             self.llm = LLM()
 
     def check_network(self):
-        r = httpx.get(self.URL14, proxy=self.proxy, timeout=5)
+        r = httpx.get(
+            self.URL14,
+            proxies={"http://": self.proxy, "https://": self.proxy},
+            timeout=5,
+        )
         if r.is_error:
             sys.exit("网络不可用")
 
@@ -338,17 +311,6 @@ class ZhiPinBase:
         query_params = parse_qs(urlparse(url).query)
         return query_params.get("securityId", [""])[0]
 
-    def check_block_list(self, data: dict) -> Optional[str]:
-        """检查字典中的值是否在相应的块列表中"""
-        for key, value in data.items():
-            if value:
-                if hasattr(value, "lower"):
-                    value = value.lower()
-                block_list = getattr(self.config, key + "_block_list", [])
-                if any(item in value for item in block_list):
-                    return key
-        return None
-
     def check_fund(self, fund_text: str) -> bool:
         """检查资金是否满足最低要求"""
         if not fund_text:
@@ -479,7 +441,3 @@ class ZhiPinBase:
         except (FileNotFoundError, json.decoder.JSONDecodeError) as e:
             self.handle_exception(e)
             return [[], [], [], 0]
-
-    @logger.catch
-    def handle_exception(self, exception):
-        raise exception
