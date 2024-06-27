@@ -36,7 +36,7 @@ class ZhiPinDrissionPage(ZhiPinBase):
     def __init__(self, args: None):
         self.args = args
         ZhiPinBase.__init__(self)
-        atexit.register(self.cleanup_DP)
+        atexit.register(self.cleanup_drission_page)
         user_cache_directory = os.path.expanduser("~") + "/.cache/"
         if os.environ.get("CI") or (
             hasattr(self.args, "headless") and self.args.headless
@@ -125,7 +125,7 @@ class ZhiPinDrissionPage(ZhiPinBase):
             self.original_page = WebPage("d", self.config.timeout, self.co, self.so)
             self.switch_page(False)
             self.page.set.auto_handle_alert(accept=False, all_tabs=True)
-            self.check_network_DP()
+            self.check_network_drission_page()
 
     def login(self):
         self.page.get(self.URL14)
@@ -147,7 +147,7 @@ class ZhiPinDrissionPage(ZhiPinBase):
         elif not cookies_page and hasattr(self, "original_page"):
             self.page = self.original_page
 
-    def cleanup_DP(self):
+    def cleanup_drission_page(self):
         if (
             hasattr(self, "original_page")
             and self.original_page
@@ -157,7 +157,7 @@ class ZhiPinDrissionPage(ZhiPinBase):
         if hasattr(self, "cookies_page") and self.cookies_page:
             self.cookies_page.quit()
 
-    def check_network_DP(self):
+    def check_network_drission_page(self):
         """
         检查网络
         """
