@@ -12,10 +12,8 @@ opencv-python
 portkey-ai
 langdetect
 arrow
-# Browser
 --extra-index-url https://gitlab.com/api/v4/projects/56789260/packages/pypi/simple
 geetest-captcha-v3-icon-analysis
 DrissionPage
 websocket-client
-# AndroidUiautomation
 # pocoui
