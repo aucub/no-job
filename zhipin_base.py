@@ -375,11 +375,7 @@ class ZhiPinBase(Base):
 
     def parse_date(self, res_text) -> datetime.date:
         date_format = "%Y-%m-%d"
-        try:
-            return arrow.Arrow.strptime(res_text, date_format).date()
-        except Exception as e:
-            self.handle_exception(e)
-        return None
+        return arrow.Arrow.strptime(res_text, date_format).date()
 
     def check_res(self, res: datetime.date) -> bool:
         """
