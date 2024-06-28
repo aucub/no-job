@@ -444,7 +444,7 @@ class ZhiPinDrissionPage(ZhiPinBase):
                 jd.scale = ""
             update_text = self.page.ele("css:p.gray").text
             if ":" in update_text:
-                jd.update_date = self.parse_update_date(update_text.split(":")[1])
+                jd.update_date = self.parse_date(update_text.split(":")[1])
             jd.description = self.page.ele("css:.job-detail-section").text
             try:
                 jd.fund = self.page.ele("css:.company-fund").text
@@ -452,7 +452,7 @@ class ZhiPinDrissionPage(ZhiPinBase):
                     jd.fund = jd.fund.splitlines()[-1]
                 res_text = self.page.ele("css:.res-time").text
                 if len(res_text.splitlines()) > 1:
-                    jd.res = self.parse_res(res_text.splitlines()[-1])
+                    jd.res = self.parse_date(res_text.splitlines()[-1])
             except ElementNotFoundError as e:
                 self.handle_exception(e)
             jd.level = self.check_jd(jd)
