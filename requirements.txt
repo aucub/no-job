@@ -16,4 +16,4 @@ arrow
 geetest-captcha-v3-icon-analysis
 DrissionPage
 websocket-client
-# pocoui
+uiautomator2

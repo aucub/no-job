@@ -1,40 +1,37 @@
-import logging
+import uiautomator2 as u2
+from uiautomator2.exceptions import UiObjectNotFoundError
 import json
 import re
 import time
 import datetime
 import arrow
-from poco.drivers.android.uiautomation import AndroidUiautomationPoco
-from poco.exceptions import PocoTargetTimeout, PocoNoSuchNodeException
 from jd import JD
 from config import Direction
 from zhipin_base import ZhiPinBase
-from airtest.core.api import connect_device
 
 
-class ZhiPinPoco(ZhiPinBase):
+class ZhiPinU2(ZhiPinBase):
     def to_up(self):
-        self.poco.swipe([0.47, 0.86], [0.45, 0.26])
+        self.d.swipe(0.47, 0.86, 0.45, 0.26)
 
     def to_down(self):
-        self.poco.swipe([0.48, 0.25], [0.43, 0.89])
+        self.d.swipe(0.48, 0.25, 0.43, 0.89)
 
     def to_left(self):
-        self.poco.swipe([0.91, 0.45], [0.05, 0.43])
+        self.d.swipe(0.91, 0.45, 0.05, 0.43)
 
     def __init__(self):
         ZhiPinBase.__init__(self)
-        logger = logging.getLogger("airtest")
-        logger.setLevel(logging.INFO)
-        connect_device("Android:///")
-        self.poco = AndroidUiautomationPoco()
+        self.d = u2.connect()
+        self.d.implicitly_wait(self.config.timeout)
+        self.d.set_input_ime()
 
     def start_app(self):
-        self.poco.device.start_app("com.hpbr.bosszhipin")
-        self.poco("com.hpbr.bosszhipin:id/cl_card_container").wait_for_appearance()
+        self.d.app_start("com.hpbr.bosszhipin")
+        self.d(resourceId="com.hpbr.bosszhipin:id/cl_card_container").wait()
 
     def stop_app(self):
-        self.poco.adb_client.stop_app("com.hpbr.bosszhipin")
+        self.d.app_stop("com.hpbr.bosszhipin")
         time.sleep(self.config.small_sleep)
 
     def iterate_query_parameters(self):
@@ -103,73 +100,66 @@ class ZhiPinPoco(ZhiPinBase):
 
     def detail(self):
         jd = JD()
-        jd.name = (
-            self.poco("com.hpbr.bosszhipin:id/tv_job_name")
-            .wait(self.config.timeout)
-            .get_text()
-        )
-        jd.boss = self.poco("com.hpbr.bosszhipin:id/tv_boss_name").get_text()
-        self.poco("com.hpbr.bosszhipin:id/iv_share").click()
-        self.poco("com.hpbr.bosszhipin:id/tv_share_link").wait(
-            self.config.large_sleep
-        ).click()
-        url = self.poco.device.get_clipboard()
+        jd.name = self.d(resourceId="com.hpbr.bosszhipin:id/tv_job_name").get_text()
+        jd.boss = self.d(resourceId="com.hpbr.bosszhipin:id/tv_boss_name").get_text()
+        self.d(resourceId="com.hpbr.bosszhipin:id/iv_share").click()
+        time.sleep(self.config.small_sleep)
+        self.d(resourceId="com.hpbr.bosszhipin:id/tv_share_link").click()
+        time.sleep(self.config.small_sleep)
+        url = self.d.clipboard
         jd.id = self.get_encryptJobId(url)
         jd.url = self.URL8 + jd.id + self.URL9
         row = self.get_jd(jd.id)
         if row and row.id == jd.id:
             jd = row
-            if self.config.skip_known:
+            if self.config.skip_known or row.communicated:
                 time.sleep(self.config.small_sleep)
                 return jd.boss
-        jd.salary = self.poco("com.hpbr.bosszhipin:id/tv_job_salary").get_text()
-        jd.address = self.poco("com.hpbr.bosszhipin:id/tv_required_location").get_text()
-        jd.experience = self.poco(
-            "com.hpbr.bosszhipin:id/tv_required_work_exp"
+        jd.salary = self.d(resourceId="com.hpbr.bosszhipin:id/tv_job_salary").get_text()
+        jd.address = self.d(
+            resourceId="com.hpbr.bosszhipin:id/tv_required_location"
         ).get_text()
-        jd.degree = self.poco("com.hpbr.bosszhipin:id/tv_required_degree").get_text()
-        tv_public_time = self.poco("com.hpbr.bosszhipin:id/tv_public_time")
+        jd.experience = self.d(
+            resourceId="com.hpbr.bosszhipin:id/tv_required_work_exp"
+        ).get_text()
+        jd.degree = self.d(
+            resourceId="com.hpbr.bosszhipin:id/tv_required_degree"
+        ).get_text()
+        tv_public_time = self.d(resourceId="com.hpbr.bosszhipin:id/tv_public_time")
         if tv_public_time.exists():
             public_time = tv_public_time.get_text()
             jd.update_date = self.parse_date(public_time)
         jd.boss_title = (
-            self.poco("com.hpbr.bosszhipin:id/tv_boss_title")
+            self.d(resourceId="com.hpbr.bosszhipin:id/tv_boss_title")
             .get_text()
             .split("·")[-1]
             .strip()
         )
-        try:
-            jd.active = (
-                self.poco("com.hpbr.bosszhipin:id/boss_label_tv")
-                .get_text()
-                .split("|")[0]
-                .strip()
-            )
-        except PocoNoSuchNodeException as e:
-            self.handle_exception(e)
-        words = ""
-        try:
-            fl_content_above = self.poco("com.hpbr.bosszhipin:id/fl_content_above")
-            btn_words = fl_content_above.child("com.hpbr.bosszhipin:id/btn_word")
-            for btn_word in btn_words:
-                words = words + btn_word.get_text()
-        except PocoNoSuchNodeException as e:
-            self.handle_exception(e)
-        self.to_up()
-        jd.description = (
-            words + self.poco("com.hpbr.bosszhipin:id/tv_description").get_text()
+        jd.active = (
+            self.d(resourceId="com.hpbr.bosszhipin:id/boss_label_tv")
+            .get_text()
+            .split("|")[0]
+            .strip()
         )
-        try:
-            jd.address = (
-                self.poco("com.hpbr.bosszhipin:id/tv_location")
-                .wait(self.config.small_sleep)
-                .get_text()
-            )
-        except (PocoNoSuchNodeException, PocoTargetTimeout) as e:
-            self.handle_exception(e)
-        jd.company = self.poco("com.hpbr.bosszhipin:id/tv_com_name").get_text()
+        words = ""
+        fl_content_above = self.d(resourceId="com.hpbr.bosszhipin:id/fl_content_above")
+        btn_words = fl_content_above.child(resourceId="com.hpbr.bosszhipin:id/btn_word")
+        for btn_word in btn_words:
+            words = words + btn_word.get_text()
+        if self.d(resourceId="com.hpbr.bosszhipin:id/tv_com_name").exists():
+            self.d.swipe(0.47, 0.86, 0.45, 0.56)
+        else:
+            self.to_up()
+        jd.description = (
+            words
+            + self.d(resourceId="com.hpbr.bosszhipin:id/tv_description").get_text()
+        )
+        jd.address = self.d(resourceId="com.hpbr.bosszhipin:id/tv_location").get_text()
+        jd.company = self.d(resourceId="com.hpbr.bosszhipin:id/tv_com_name").get_text()
         tv_com_info = (
-            self.poco("com.hpbr.bosszhipin:id/tv_com_info").get_text().split("•")
+            self.d(resourceId="com.hpbr.bosszhipin:id/tv_com_info")
+            .get_text()
+            .split("•")
         )
         jd.scale = tv_com_info[-2].strip()
         jd.industry = tv_com_info[-1].strip()
@@ -182,71 +172,69 @@ class ZhiPinPoco(ZhiPinBase):
 
     def execute_query_jobs(self, city, query, salary):
         time.sleep(self.config.large_sleep)
-        self.poco.click([0.92, 0.07])
-        self.poco("com.hpbr.bosszhipin:id/et_search").wait(
-            self.config.large_sleep
-        ).set_text(query)
+        self.d.click(0.92, 0.07)
+        self.d(resourceId="com.hpbr.bosszhipin:id/et_search").set_text(query)
         time.sleep(self.config.small_sleep)
-        self.poco("com.hpbr.bosszhipin:id/tv_search").click()
-        self.poco("com.hpbr.bosszhipin:id/view_job_card").wait(self.config.timeout)
-        tab_labels = self.poco("com.hpbr.bosszhipin:id/tv_tab_label")
+        self.d(resourceId="com.hpbr.bosszhipin:id/tv_search").click()
+        self.d(resourceId="com.hpbr.bosszhipin:id/view_job_card")
+        tab_labels = self.d(resourceId="com.hpbr.bosszhipin:id/tv_tab_label")
         tab_labels[3].click()
-        self.poco("com.hpbr.bosszhipin:id/tv_btn_action").wait(
-            self.config.large_sleep
-        ).click()
+        time.sleep(self.config.small_sleep)
+        self.d(resourceId="com.hpbr.bosszhipin:id/tv_btn_action").click()
         time.sleep(self.config.large_sleep)
         try:
-            self.poco(text=city).wait(self.config.large_sleep).click()
-        except PocoNoSuchNodeException as e:
-            self.poco("com.hpbr.bosszhipin:id/iv_back").click()
+            self.d(text=city).click()
+        except UiObjectNotFoundError as e:
+            self.d(resourceId="com.hpbr.bosszhipin:id/iv_back").click()
             time.sleep(self.config.small_sleep)
-            self.poco("com.hpbr.bosszhipin:id/iv_back").click()
+            self.d(resourceId="com.hpbr.bosszhipin:id/iv_back").click()
             self.handle_exception(e)
         time.sleep(self.config.small_sleep)
-        self.poco("com.hpbr.bosszhipin:id/view_job_card").wait(self.config.timeout)
+        self.d(resourceId="com.hpbr.bosszhipin:id/view_job_card")
         tab_labels[5].click()
-        self.poco("com.hpbr.bosszhipin:id/btn_confirm").wait(self.config.large_sleep)
+        self.d(resourceId="com.hpbr.bosszhipin:id/btn_confirm")
         try:
             for label in self.config.query_label_list_ui:
                 if Direction.UP.value in label:
                     self.to_up()
                     time.sleep(self.config.small_sleep)
                     continue
-                self.poco(text=label).click()
+                self.d(text=label).click()
             self.to_down()
             time.sleep(self.config.small_sleep)
-            self.poco(text=salary).click()
+            self.d(text=salary).click()
             time.sleep(self.config.small_sleep)
-            self.poco("com.hpbr.bosszhipin:id/btn_confirm").click()
-        except PocoNoSuchNodeException as e:
-            self.poco("com.hpbr.bosszhipin:id/iv_back").click()
+            self.d(resourceId="com.hpbr.bosszhipin:id/btn_confirm").click()
+        except UiObjectNotFoundError as e:
+            self.d(resourceId="com.hpbr.bosszhipin:id/iv_back").click()
             self.handle_exception(e)
         time.sleep(self.config.small_sleep)
         tab_labels[4].click()
+        time.sleep(self.config.small_sleep)
         try:
-            self.poco(text="最新优先").click()
-        except PocoNoSuchNodeException as e:
-            self.poco.click([0.47, 0.56])
+            self.d(text="最新优先").click()
+        except UiObjectNotFoundError as e:
+            self.d.click(0.47, 0.56)
             self.handle_exception(e)
         time.sleep(self.config.large_sleep)
-        job_cards = self.poco("com.hpbr.bosszhipin:id/view_job_card").wait(
-            self.config.timeout
-        )
+        job_cards = self.d(resourceId="com.hpbr.bosszhipin:id/view_job_card")
         if len(job_cards) == 0:
             return
-        job_cards[0].parent().click()
+        x, y = job_cards[0].center()
+        self.d.click(x, y)
         for page in range(0, 40):
+            text = None
             try:
                 text = self.detail()
-            except (PocoTargetTimeout, PocoNoSuchNodeException, TypeError) as e:
+            except (UiObjectNotFoundError, TypeError) as e:
                 self.handle_exception(e)
             self.to_left()
             time.sleep(self.config.small_sleep)
-            if "text" in locals() and text:
+            if text:
                 try:
-                    if self.poco(text=text).exists():
+                    if self.d(text=text).exists:
                         break
-                except PocoTargetTimeout as e:
+                except UiObjectNotFoundError as e:
                     self.handle_exception(e)
 
     def test_query(self):
@@ -254,5 +242,5 @@ class ZhiPinPoco(ZhiPinBase):
 
 
 if __name__ == "__main__":
-    zpp = ZhiPinPoco()
+    zpp = ZhiPinU2()
     zpp.test_query()

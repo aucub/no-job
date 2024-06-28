@@ -108,11 +108,6 @@ class Config:
     ]
     query_label_list_ui: List = [
         "高中",
-        "大专",
-        "本科",
-        "应届生",
-        "经验不限",
-        "1年以内",
         "1-3年",
         Direction.UP.value,
         "20-99人",
