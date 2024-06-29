@@ -1,13 +1,13 @@
-import uiautomator2 as u2
-from uiautomator2.exceptions import UiObjectNotFoundError
 import json
 import re
 import time
 import datetime
 import arrow
+import uiautomator2 as u2
 from jd import JD
 from config import Direction
 from zhipin_base import ZhiPinBase
+from uiautomator2.exceptions import UiObjectNotFoundError
 
 
 class ZhiPinU2(ZhiPinBase):

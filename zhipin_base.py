@@ -1,8 +1,7 @@
 import json
 import os
 import re
-import sys
-import httpx
+import requests
 import datetime
 import arrow
 import peewee
@@ -43,13 +42,12 @@ class ZhiPinBase(Base):
             self.llm = LLM()
 
     def check_network(self):
-        r = httpx.get(
+        r = requests.get(
             self.URL14,
             proxies={"http://": self.proxy, "https://": self.proxy},
             timeout=5,
         )
-        if r.is_error:
-            sys.exit("网络不可用")
+        r.raise_for_status()
 
     def iterate_query_parameters(self):
         for city in self.config.query_city_list:
