@@ -94,15 +94,13 @@ class ZhiPinBase(Base):
             jd = JD()
             jd.id = job.get("encryptJobId")
             jd.communicated = not job.get("contact", True)
-            if jd.communicated:
-                continue
             row = self.get_jd(jd.id)
             if row and row.id == jd.id:
                 if (
                     self.config.skip_known
-                    and row.level
-                    and row.level != Level.LIST.value
-                ):
+                    and row._failed_fields
+                    and len(row._failed_fields) > 0
+                ) or row.communicated:
                     continue
                 jd = row
             jd.url = f"{self.URL8}{jd.id}{self.URL9}"
@@ -267,7 +265,7 @@ class ZhiPinBase(Base):
         except (peewee.OperationalError, peewee.InterfaceError) as e:
             self.handle_exception(e)
             JD.reconnect()
-        return JD()
+            return JD()
 
     def check_boss_id(self, jd: JD) -> bool:
         return not (

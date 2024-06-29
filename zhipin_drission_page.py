@@ -33,11 +33,26 @@ class ZhiPinDrissionPage(ZhiPinBase):
             s.bind(("", 0))
             return s.getsockname()[1]
 
-    def __init__(self, args: None):
-        self.args = args
+    def __init__(self):
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "--communicate",
+            action="store_true",
+            help="Enable communicate option",
+        )
+        parser.add_argument(
+            "--headless", action="store_true", help="Enable headless option"
+        )
+        user_cache_directory = os.path.expanduser("~") + "/.cache/"
+        parser.add_argument(
+            "-p",
+            "--data_path",
+            help="Data path",
+            default=user_cache_directory + "chromium-temp-cookies",
+        )
+        self.args = parser.parse_args()
         ZhiPinBase.__init__(self)
         atexit.register(self.cleanup_drission_page)
-        user_cache_directory = os.path.expanduser("~") + "/.cache/"
         if os.environ.get("CI") or (
             hasattr(self.args, "headless") and self.args.headless
         ):
@@ -49,7 +64,7 @@ class ZhiPinDrissionPage(ZhiPinBase):
             .set_timeouts(self.config.timeout)
             .set_retry(self.config.max_retries)
             .headless(self.headless)
-            .set_paths(user_data_path=user_cache_directory + "chromium-temp-cookies")
+            .set_paths(user_data_path=self.args.data_path)
             .set_pref("credentials_enable_service", False)
             .set_pref("enable_do_not_track", True)
             .set_pref("webrtc.ip_handling_policy", "disable_non_proxied_udp")
@@ -126,6 +141,10 @@ class ZhiPinDrissionPage(ZhiPinBase):
             self.switch_page(False)
             self.page.set.auto_handle_alert(accept=False, all_tabs=True)
             self.check_network_drission_page()
+        if self.args.communicate:
+            self.test_communicate()
+        else:
+            self.test_query()
 
     def login(self):
         self.page.get(self.URL14)
@@ -148,11 +167,7 @@ class ZhiPinDrissionPage(ZhiPinBase):
             self.page = self.original_page
 
     def cleanup_drission_page(self):
-        if (
-            hasattr(self, "original_page")
-            and self.original_page
-            and hasattr(self.original_page, "quit")
-        ):
+        if hasattr(self, "original_page") and self.original_page:
             self.original_page.quit()
         if hasattr(self, "cookies_page") and self.cookies_page:
             self.cookies_page.quit()
@@ -182,10 +197,8 @@ class ZhiPinDrissionPage(ZhiPinBase):
             try:
                 self.query_jobs(*args)
                 break
-            except ElementNotFoundError as e:
+            except (ElementNotFoundError, VerifyException) as e:
                 self.handle_exception(e)
-            except VerifyException:
-                pass
 
     def query_jobs(self, *args):
         if self.config.query_token:
@@ -210,15 +223,15 @@ class ZhiPinDrissionPage(ZhiPinBase):
             + self.URL3
             + str(page)
         )
-        data_list = self.page.listen.wait(
-            timeout=self.config.large_sleep, fit_count=False, raise_err=False
+        listen_result = self.page.listen.wait(
+            timeout=self.config.large_sleep, raise_err=False
         )
         url_list = []
-        if data_list:
-            if not isinstance(data_list, Iterable):
-                data_list = [data_list]
+        if listen_result:
+            if not isinstance(listen_result, Iterable):
+                listen_result = [listen_result]
             try:
-                for data in data_list:
+                for data in listen_result:
                     if not data.is_failed:
                         if data.response.status == 200:
                             url_list.extend(self.parse_joblist(data.response.raw_body))
@@ -246,17 +259,15 @@ class ZhiPinDrissionPage(ZhiPinBase):
                 jd = JD()
                 job_info_html = element.ele(".:job-info clearfix").inner_html
                 jd.communicated = not self.contactable(job_info_html)
-                if jd.communicated:
-                    continue
                 url = element.ele("css:.job-card-left").property("href")
                 jd.id = self.get_encryptJobId(url)
-                row = self.get_jd(id)
-                if row and row.id == id:
+                row = self.get_jd(jd.id)
+                if row and row.id == jd.id:
                     if (
                         self.config.skip_known
-                        and row.level
-                        and row.level != Level.LIST.value
-                    ):
+                        and row._failed_fields
+                        and len(row._failed_fields) > 0
+                    ) or row.communicated:
                         continue
                     jd = row
                 jd.url = url.split("&securityId")[0]
@@ -417,6 +428,7 @@ class ZhiPinDrissionPage(ZhiPinBase):
                 self.handle_exception(e)
             self.change_page_mode("d")
             self.dp_detail(url)
+        self.change_page_mode("d")
 
     def detail(self, url):
         self.page.get(
@@ -548,17 +560,4 @@ class ZhiPinDrissionPage(ZhiPinBase):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--communicate",
-        action="store_true",
-        help="Enable communicate option",
-    )
-    parser.add_argument(
-        "--headless", action="store_true", help="Enable headless option"
-    )
-    zpDP = ZhiPinDrissionPage(args=parser.parse_args())
-    if zpDP.args.communicate:
-        zpDP.test_communicate()
-    else:
-        zpDP.test_query()
+    ZhiPinDrissionPage()
