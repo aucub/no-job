@@ -11,7 +11,6 @@ import cv2
 import arrow
 from captcha import cracker
 from zhipin_base import ZhiPinBase, VerifyException
-from httpx import HTTPError
 from jd import JD, Level
 from DrissionPage import ChromiumPage, ChromiumOptions, SessionOptions, WebPage
 from DrissionPage.common import Settings, wait_until
@@ -331,7 +330,6 @@ class ZhiPinDrissionPage(ZhiPinBase):
                 if "safe/verify-slider" not in current_url:
                     break
             except (
-                HTTPError,
                 ZeroDivisionError,
                 ElementNotFoundError,
                 cv2.error,

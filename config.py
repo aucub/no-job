@@ -1,6 +1,6 @@
 import os
 import attr
-import httpx
+import requests
 import toml
 from enum import Enum
 from typing import List
@@ -135,7 +135,7 @@ def save_config(config: Config) -> None:
 def load_config() -> Config:
     if os.getenv("CONFIG_URL"):
         env_config_url = str(os.getenv("CONFIG_URL"))
-        response = httpx.get(env_config_url)
+        response = requests.get(env_config_url)
         response.raise_for_status()
         with open("config.toml", "wb") as file:
             file.write(response.content)
