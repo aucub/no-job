@@ -150,6 +150,9 @@ class ZhiPinU2(ZhiPinBase):
             self.d.swipe(0.47, 0.86, 0.45, 0.56)
         else:
             self.to_up()
+        see_more = self.d(text="查看更多")
+        if see_more.exists():
+            self.d.click(*see_more.center())
         jd.description = (
             words
             + self.d(resourceId="com.hpbr.bosszhipin:id/tv_description").get_text()
@@ -220,8 +223,7 @@ class ZhiPinU2(ZhiPinBase):
         job_cards = self.d(resourceId="com.hpbr.bosszhipin:id/view_job_card")
         if len(job_cards) == 0:
             return
-        x, y = job_cards[0].center()
-        self.d.click(x, y)
+        self.d.click(*job_cards[0].center())
         for page in range(0, 40):
             text = None
             try:
