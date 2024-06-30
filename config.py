@@ -78,7 +78,6 @@ class Config:
     description_min: int = 40  # 最短描述
     description_necessary_list: List = []  # 描述必备词
     description_block_list: List = []  # 描述阻止名单
-    skill_block_list: List = []
     description_experience_block_list: List = []  # 描述经验阻止名单
     description_experience_list: List = []  # 描述经验名单
     query_list: List = []
