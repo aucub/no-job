@@ -92,13 +92,11 @@ class ZhiPinBase(Base):
             jd = JD()
             jd.id = job.get("encryptJobId")
             jd.communicated = not job.get("contact", True)
+            if self.config.skip_known and self.check_jd_known(jd.id):
+                continue
             row = self.get_jd(jd.id)
             if row and row.id == jd.id:
-                if (
-                    self.config.skip_known
-                    and row._failed_fields
-                    and len(row._failed_fields) > 0
-                ) or row.communicated:
+                if row.communicated or row.level == Level.COMMUNICATE.value:
                     continue
                 jd = row
             jd.url = f"{self.URL8}{jd.id}{self.URL9}"
@@ -264,6 +262,18 @@ class ZhiPinBase(Base):
             self.handle_exception(e)
             JD.reconnect()
             return JD()
+
+    def check_jd_known(self, id: str) -> bool:
+        try:
+            return (
+                JD.select()
+                .where((JD.id == id) & (peewee.fn.LENGTH(JD._failed_fields) > 0))
+                .exists()
+            )
+        except (peewee.OperationalError, peewee.InterfaceError) as e:
+            self.handle_exception(e)
+            JD.reconnect()
+            return False
 
     def check_boss_id(self, jd: JD) -> bool:
         return not (
