@@ -260,13 +260,11 @@ class ZhiPinDrissionPage(ZhiPinBase):
                 jd.communicated = not self.contactable(job_info_html)
                 url = element.ele("css:.job-card-left").property("href")
                 jd.id = self.get_encryptJobId(url)
+                if self.config.skip_known and self.check_jd_known(jd.id):
+                    continue
                 row = self.get_jd(jd.id)
                 if row and row.id == jd.id:
-                    if (
-                        self.config.skip_known
-                        and row._failed_fields
-                        and len(row._failed_fields) > 0
-                    ) or row.communicated:
+                    if row.communicated or row.level == Level.COMMUNICATE.value:
                         continue
                     jd = row
                 jd.url = url.split("&securityId")[0]
