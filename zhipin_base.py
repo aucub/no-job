@@ -198,7 +198,7 @@ class ZhiPinBase(Base):
                 ("offline", lambda jd: self.check_offline(jd.description, jd.city)),
                 ("fund", lambda jd: self.check_fund(jd.fund)),
                 ("communicated", lambda jd: not jd.communicated),
-                ("boss_id", lambda jd: self.check_boss_id(jd)),
+                ("boss_id", lambda jd: self.check_boss_id(jd.boss_id)),
             ],
         }
         block_list_fields = {
@@ -236,6 +236,10 @@ class ZhiPinBase(Base):
         if failed_fields:
             jd.failed_fields = failed_fields
             return False
+        elif stage == Level.DETAIL.value and (
+            jd.level == Level.DETAIL.value or jd.level == Level.COMMUNICATE.value
+        ):
+            jd._failed_fields = None
         return True
 
     def save_jd(self, jd: JD):
@@ -275,10 +279,12 @@ class ZhiPinBase(Base):
             JD.reconnect()
             return False
 
-    def check_boss_id(self, jd: JD) -> bool:
+    def check_boss_id(self, boss_id: str) -> bool:
+        if not boss_id:
+            return True
         return not (
             JD.select()
-            .where((JD.boss_id == jd.boss_id) & (JD.communicated == True))  # noqa: E712
+            .where((JD.boss_id == boss_id) & (JD.communicated == True))  # noqa: E712
             .exists()
         )
 
@@ -297,7 +303,7 @@ class ZhiPinBase(Base):
         ]
 
     def check_communicate(self, jd: JD) -> bool:
-        result = self.check_boss_id(jd)
+        result = self.check_boss_id(jd.boss_id)
         if result and self.config.llm_check:
             result = result and self.llm.check_jd(self.config.llm_check_prompt, jd)
         if result:

@@ -4,7 +4,7 @@ import time
 import datetime
 import arrow
 import uiautomator2 as u2
-from jd import JD
+from jd import JD, Level
 from config import Direction
 from zhipin_base import ZhiPinBase
 from uiautomator2.exceptions import UiObjectNotFoundError
@@ -44,9 +44,14 @@ class ZhiPinU2(ZhiPinBase):
                 for salary in self.config.salary_list_ui:
                     if salary in self.wheels[2]:
                         continue
-                    self.stop_app()
-                    self.start_app()
-                    self.execute_query_jobs(city, query, salary)
+                    for _ in range(self.config.max_retries):
+                        try:
+                            self.stop_app()
+                            self.start_app()
+                            self.execute_query_jobs(city, query, salary)
+                            break
+                        except UiObjectNotFoundError as e:
+                            self.handle_exception(e)
                     self.wheels[2].append(salary)
                     self.save_state(self.wheels)
                 self.wheels[2] = []
@@ -63,20 +68,13 @@ class ZhiPinU2(ZhiPinBase):
         match = re.search(field_pattern, url)
         if match:
             return match.group(1)
-        else:
-            return ""
 
     def parse_date(self, update_text) -> datetime.date:
-        try:
-            days_pattern = r"(\d+)日内"
-            match = re.search(days_pattern, update_text)
-            if match:
-                days_str = match.group(1)
-                days = int(days_str)
-                return arrow.now().shift(days=days).date()
-        except Exception as e:
-            self.handle_exception(e)
-        return None
+        days_pattern = r"(\d+)日内"
+        match = re.search(days_pattern, update_text)
+        if match:
+            days_str = match.group(1)
+            return arrow.now().shift(days=int(days_str)).date()
 
     def save_state(self, wheels):
         with open(
@@ -94,7 +92,7 @@ class ZhiPinU2(ZhiPinBase):
                 encoding="utf-8",
             ) as f:
                 return json.load(f)
-        except Exception as e:
+        except (FileNotFoundError, json.decoder.JSONDecodeError) as e:
             self.handle_exception(e)
             return [[], [], []]
 
@@ -109,12 +107,15 @@ class ZhiPinU2(ZhiPinBase):
         url = self.d.clipboard
         jd.id = self.get_encryptJobId(url)
         jd.url = self.URL8 + jd.id + self.URL9
+        jd.communicated = self.d(text="继续沟通").exists()
+        if self.config.skip_known and self.check_jd_known(jd.id):
+            return jd.id
         row = self.get_jd(jd.id)
         if row and row.id == jd.id:
             jd = row
-            if self.config.skip_known or row.communicated:
-                time.sleep(self.config.small_sleep)
-                return jd.boss
+            if row.communicated or row.level == Level.COMMUNICATE.value:
+                return jd.id
+        jd.city = self.city
         jd.salary = self.d(resourceId="com.hpbr.bosszhipin:id/tv_job_salary").get_text()
         jd.address = self.d(
             resourceId="com.hpbr.bosszhipin:id/tv_required_location"
@@ -127,37 +128,40 @@ class ZhiPinU2(ZhiPinBase):
         ).get_text()
         tv_public_time = self.d(resourceId="com.hpbr.bosszhipin:id/tv_public_time")
         if tv_public_time.exists():
-            public_time = tv_public_time.get_text()
-            jd.update_date = self.parse_date(public_time)
+            jd.update_date = self.parse_date(tv_public_time.get_text())
         jd.boss_title = (
             self.d(resourceId="com.hpbr.bosszhipin:id/tv_boss_title")
             .get_text()
             .split("·")[-1]
             .strip()
         )
-        jd.active = (
-            self.d(resourceId="com.hpbr.bosszhipin:id/boss_label_tv")
-            .get_text()
-            .split("|")[0]
-            .strip()
-        )
+        boss_label_tv = self.d(resourceId="com.hpbr.bosszhipin:id/boss_label_tv")
+        if boss_label_tv.exists():
+            jd.active = boss_label_tv.get_text().split("|")[0].strip()
         words = ""
-        fl_content_above = self.d(resourceId="com.hpbr.bosszhipin:id/fl_content_above")
-        btn_words = fl_content_above.child(resourceId="com.hpbr.bosszhipin:id/btn_word")
+        fl_content_above = self.d(
+            resourceId="com.hpbr.bosszhipin:id/fl_content_above"
+        )  # 职位详情
+        btn_words = fl_content_above.child(
+            resourceId="com.hpbr.bosszhipin:id/btn_word"
+        )  # 标签
         for btn_word in btn_words:
             words = words + btn_word.get_text()
         if self.d(resourceId="com.hpbr.bosszhipin:id/tv_com_name").exists():
-            self.d.swipe(0.47, 0.86, 0.45, 0.56)
+            self.d.swipe(0.47, 0.86, 0.45, 0.56)  # 上滑一半
         else:
             self.to_up()
         see_more = self.d(text="查看更多")
         if see_more.exists():
-            self.d.click(*see_more.center())
+            see_more.click()
+            time.sleep(self.config.small_sleep)
         jd.description = (
             words
             + self.d(resourceId="com.hpbr.bosszhipin:id/tv_description").get_text()
         )
-        jd.address = self.d(resourceId="com.hpbr.bosszhipin:id/tv_location").get_text()
+        tv_location = self.d(resourceId="com.hpbr.bosszhipin:id/tv_location")
+        if tv_location.exists():
+            jd.address = tv_location.get_text()
         jd.company = self.d(resourceId="com.hpbr.bosszhipin:id/tv_com_name").get_text()
         tv_com_info = (
             self.d(resourceId="com.hpbr.bosszhipin:id/tv_com_info")
@@ -166,14 +170,12 @@ class ZhiPinU2(ZhiPinBase):
         )
         jd.scale = tv_com_info[-2].strip()
         jd.industry = tv_com_info[-1].strip()
-        jd.checked_time = datetime.datetime.now()
         jd.level = self.check_jd(jd)
         self.save_jd(jd)
-        self.to_down()
-        time.sleep(self.config.small_sleep)
-        return jd.boss
+        return jd.id
 
     def execute_query_jobs(self, city, query, salary):
+        self.city = city
         time.sleep(self.config.large_sleep)
         self.d.click(0.92, 0.07)
         self.d(resourceId="com.hpbr.bosszhipin:id/et_search").set_text(query)
@@ -224,25 +226,24 @@ class ZhiPinU2(ZhiPinBase):
         if len(job_cards) == 0:
             return
         self.d.click(*job_cards[0].center())
-        for page in range(0, 40):
-            text = None
+        previous_id = None
+        for _ in range(0, self.config.page_max * 30):
             try:
-                text = self.detail()
+                id = self.detail()
+                if id == previous_id:
+                    break
+                else:
+                    previous_id = id
             except (UiObjectNotFoundError, TypeError) as e:
                 self.handle_exception(e)
             self.to_left()
             time.sleep(self.config.small_sleep)
-            if text:
-                try:
-                    if self.d(text=text).exists:
-                        break
-                except UiObjectNotFoundError as e:
-                    self.handle_exception(e)
 
     def test_query(self):
+        self.config.small_sleep = 1.0
         self.iterate_query_parameters()
 
 
 if __name__ == "__main__":
-    zpp = ZhiPinU2()
-    zpp.test_query()
+    zp_u2 = ZhiPinU2()
+    zp_u2.test_query()
