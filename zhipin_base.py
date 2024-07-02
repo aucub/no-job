@@ -9,11 +9,11 @@ from typing import Callable, Dict, List, Tuple
 from jd import JD, Level, jobType
 from base import Base, VerifyException
 from ai import LLM
-from langdetect import detect
 from urllib.parse import parse_qs, urlparse
 
 
 class ZhiPinBase(Base):
+    URL0 = "https://www.zhipin.com/"
     URL1 = "https://www.zhipin.com/web/geek/job?query="
     URL3 = "&page="
     URL4 = "https://www.zhipin.com/wapi/zpgeek/job/card.json?securityId="
@@ -198,7 +198,6 @@ class ZhiPinBase(Base):
                 ("offline", lambda jd: self.check_offline(jd.description, jd.city)),
                 ("fund", lambda jd: self.check_fund(jd.fund)),
                 ("communicated", lambda jd: not jd.communicated),
-                ("boss_id", lambda jd: self.check_boss_id(jd.boss_id)),
             ],
         }
         block_list_fields = {
@@ -236,9 +235,7 @@ class ZhiPinBase(Base):
         if failed_fields:
             jd.failed_fields = failed_fields
             return False
-        elif stage == Level.DETAIL.value and (
-            jd.level == Level.DETAIL.value or jd.level == Level.COMMUNICATE.value
-        ):
+        elif stage == Level.DETAIL.value and jd.level == Level.COMMUNICATE.value:
             jd._failed_fields = None
         return True
 
@@ -272,6 +269,7 @@ class ZhiPinBase(Base):
             return (
                 JD.select()
                 .where((JD.id == id) & (peewee.fn.LENGTH(JD._failed_fields) > 0))
+                .limit(1)
                 .exists()
             )
         except (peewee.OperationalError, peewee.InterfaceError) as e:
@@ -285,6 +283,7 @@ class ZhiPinBase(Base):
         return not (
             JD.select()
             .where((JD.boss_id == boss_id) & (JD.communicated == True))  # noqa: E712
+            .limit(1)
             .exists()
         )
 
@@ -352,11 +351,10 @@ class ZhiPinBase(Base):
         if match:
             low_salary = int(match.group(1))
             return low_salary < self.config.salary_max
+        return True
 
     def check_description(self, description_text: str) -> bool:
         """检查职位描述"""
-        if detect(description_text) != "zh-cn":
-            return False
         if len(description_text) < self.config.description_min:
             return False
         description_text = description_text.lower()
@@ -376,7 +374,7 @@ class ZhiPinBase(Base):
                     return False
             except (ValueError, arrow.parser.ParserError) as e:
                 self.handle_exception(e)
-            description_text = description_text.replace(exp_date_match.group(0), "")
+            description_text = description_text.replace(exp_date_match.group(), "")
         # 检查经验名单
         return any(
             item in description_text for item in self.config.description_experience_list
@@ -430,16 +428,7 @@ class ZhiPinBase(Base):
             json.dump(wheels, f, ensure_ascii=False)
 
     def load_state(self) -> list[tuple[list[str], list[str], list[str], int]]:
-        env_state = os.getenv("STATE")
         try:
-            if env_state:
-                with open(
-                    "state.json",
-                    "w",
-                    encoding="utf-8",
-                ) as f:
-                    f.write(env_state)
-                return json.loads(env_state)
             with open(
                 "state.json",
                 "r",

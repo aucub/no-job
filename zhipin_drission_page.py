@@ -202,15 +202,14 @@ class ZhiPinDrissionPage(ZhiPinBase):
     def query_jobs(self, *args):
         if self.config.query_token:
             self.switch_page(True)
-        query_list = self.job_list(*args)
+        url_list = self.job_list(*args)
         if self.config.query_token:
             if not self.check_login():
                 sys.exit("登录状态丢失")
             self.switch_page(False)
-        self.detail_list(query_list)
+        self.detail_list(url_list)
 
     def job_list(self, city, query, salary, page) -> list[str]:
-        self.page.set.load_mode.none()
         self.page.listen.start("wapi/zpgeek/search/joblist")
         self.page.get(
             self.URL1
@@ -237,8 +236,6 @@ class ZhiPinDrissionPage(ZhiPinBase):
             except (VerifyException, JSONDecodeError) as e:
                 self.handle_exception(e)
         self.page.listen.stop()
-        self.page.stop_loading()
-        self.page.set.load_mode.normal()
         if len(url_list) > 0:
             return url_list
         try:
@@ -341,7 +338,9 @@ class ZhiPinDrissionPage(ZhiPinBase):
             sys.exit("403或错误")
         if "job_detail" in current_url:
             try:
-                error_text = self.page.ele(".error-content").text
+                error_text = self.page.ele(
+                    ".error-content", timeout=self.config.large_sleep
+                ).text
                 if "无法继续" in error_text:
                     self.page.get_screenshot(
                         path="tmp", name="error.jpg", full_page=True
@@ -435,11 +434,8 @@ class ZhiPinDrissionPage(ZhiPinBase):
 
     def dp_detail(self, url):
         jd = self.get_jd(self.get_encryptJobId(url))
-        self.page.set.load_mode.none()
-        self.page.get(url)
+        self.page.get(jd.url)
         try:
-            self.page.ele("职位描述")
-            self.page.stop_loading()
             element = self.page.ele("@|class=btn btn-more@|class=btn btn-startchat")
             jd.communicated = not self.contactable(element.text)
             if jd.communicated:
@@ -469,7 +465,6 @@ class ZhiPinDrissionPage(ZhiPinBase):
             self.handle_exception(e)
             self.check_dialog()
             self.check_verify()
-        self.page.set.load_mode.normal()
 
     def start_chat(self, url: str):
         self.page.get(url)

@@ -1,6 +1,4 @@
-import os
 import attr
-import requests
 import toml
 from enum import Enum
 from typing import List
@@ -13,7 +11,6 @@ class Direction(Enum):
 @attr.dataclass
 @attr.s(init=False)
 class Config:
-    cookies_path: str = ""
     query_token: bool = True
     always_token: bool = False
     captcha_image_path: str = "captcha"
@@ -21,14 +18,13 @@ class Config:
     sleep: float = 0.0
     small_sleep: float = 2.0
     large_sleep: float = 7.0
-    reconnect_time: float = 4.0
     max_retries: int = 3
     llm_chat: bool = False
     skip_known: bool = False
     llm_check: bool = False
     llm_check_prompt: str = "我希望你充当求职者的招聘信息检查助手，你将检查职位描述的质量。请仅提供“true”或“false结果，无需解释。"
     resume: str = ""
-    salary_max: int = 8
+    salary_max: int = 9
     position_block_list: List = []
     active_block_list: List = [
         "半年",
@@ -53,7 +49,6 @@ class Config:
     scale_block_list: List = ["-20"]  # 规模阻止名单
     degree_block_list: List = ["硕", "博"]  # 学历阻止名单
     experience_block_list: List = []  # 经验阻止名单
-    position_block_list: List = []
     location_block_list: List = []
 
     @property
@@ -75,7 +70,7 @@ class Config:
     update_furthest: int = 7776000  # 最旧更新时间
     offline_interview: bool = True  # 线下检查
     offline_city_list: List = []  # 线下城市
-    description_min: int = 40  # 最短描述
+    description_min: int = 30  # 最短描述
     description_necessary_list: List = []  # 描述必备词
     description_block_list: List = []  # 描述阻止名单
     description_experience_block_list: List = []  # 描述经验阻止名单
@@ -116,14 +111,6 @@ class Config:
         "10000人以上",
     ]
     salary_list_ui: List = ["3-5K", "5-10K"]
-    """
-    zhaopin
-    """
-    query_city_list_zhaopin: List = [
-        "653",
-    ]
-    query_we_zhaopin: List = ["0000", "0001"]
-    query_sl_zhaopin: str = "0000-8000"
 
 
 def save_config(config: Config) -> None:
@@ -132,12 +119,6 @@ def save_config(config: Config) -> None:
 
 
 def load_config() -> Config:
-    if os.getenv("CONFIG_URL"):
-        env_config_url = str(os.getenv("CONFIG_URL"))
-        response = requests.get(env_config_url)
-        response.raise_for_status()
-        with open("config.toml", "wb") as file:
-            file.write(response.content)
     with open("config.toml", "r") as f:
         config_dict = toml.load(f)
         return Config(**config_dict)

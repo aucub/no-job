@@ -17,7 +17,6 @@ class VerifyException(Exception):
 
 class Base:
     config = load_config()
-    page_count = None
     mongo_url = os.getenv("MONGO_URL")
     mongo_client = MongoClient(host=mongo_url, server_api=ServerApi("1"))
     proxy = os.getenv("PROXY") or os.getenv("HTTP_PROXY") or None
