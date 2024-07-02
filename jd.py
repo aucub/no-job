@@ -1,7 +1,7 @@
 import os
 import time
 from enum import Enum
-from urllib.parse import parse_qs, urlparse
+from dotenv import load_dotenv
 from peewee import (
     Model,
     CharField,
@@ -11,7 +11,7 @@ from peewee import (
     TextField,
     MySQLDatabase,
 )
-from dotenv import load_dotenv
+from urllib.parse import parse_qs, urlparse
 
 load_dotenv()
 db_url = urlparse(os.getenv("MYSQL_URL"))
@@ -83,10 +83,11 @@ class JD(Model):
 
     class Meta:
         database = db
+        indexes = ((("id", "_failed_fields"), True),)
 
     def reconnect():
         JD._meta.database.close()
-        time.sleep(2)
+        time.sleep(3)
         JD._meta.database.connect(reuse_if_open=True)
 
 
