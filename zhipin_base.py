@@ -5,6 +5,7 @@ import requests
 import datetime
 import arrow
 import peewee
+import asyncio
 from typing import Callable, Dict, List, Tuple
 from jd import JD, Level, jobType
 from base import Base, VerifyException
@@ -87,46 +88,53 @@ class ZhiPinBase(Base):
             raise VerifyException(data)
         self.mongo["joblist"].insert_one(data)
         job_list = data["zpData"].get("jobList", [])
-        lid = data["zpData"].get("lid", "")
-        for job in job_list:
-            jd = JD()
-            jd.id = job.get("encryptJobId")
-            jd.communicated = not job.get("contact", True)
-            if self.config.skip_known and self.check_jd_known(jd.id):
-                continue
-            row = self.get_jd(jd.id)
-            if row and row.id == jd.id:
-                if row.communicated or row.level == Level.COMMUNICATE.value:
-                    continue
-                jd = row
-            jd.url = f"{self.URL8}{jd.id}{self.URL9}"
-            jd.name = job.get("jobName")
-            jd.city = job.get("cityName")
-            jd.company = job.get("brandName")
-            jd.industry = job.get("brandIndustry")
-            jd.scale = job.get("brandScaleName", "")
-            jd.address = f"{job.get('cityName', '')} {job.get('areaDistrict', '')} {job.get('businessDistrict', '')}"
-            jd.experience = job.get("jobExperience")
-            jd.degree = job.get("jobDegree")
-            jd.salary = job.get("salaryDesc") or job.get("jobSalary")
-            jd.boss = job.get("bossName")
-            jd.boss_title = job.get("bossTitle")
-            jd.boss_id = job.get("encryptBossId")
-            jd.skill = set(job.get("skills", []))
-            jd.type = jobType.get(job.get("jobType"))
-            jd.proxy = job.get("proxyJob")
-            last_modify_time = job.get("lastModifyTime")
-            if last_modify_time and isinstance(last_modify_time, (int, float)):
-                jd.update_date = arrow.Arrow.fromtimestamp(
-                    last_modify_time / 1000
-                ).date()
-            jd.level = Level.LIST.value
-            self.save_jd(jd)
-            if self.check_jd_stage(jd, Level.LIST.value):
-                url_list.append(
-                    f"{jd.url}{self.URL10}{lid}{self.URL11}{job.get('securityId')}{self.URL6}"
-                )
+        results = asyncio.run(self.parse_job_tasks(job_list))
+        for url in results:
+            if url:
+                url_list.append(url)
         return url_list
+
+    async def parse_job_tasks(self, job_list) -> list[JD]:
+        tasks = []
+        for job in job_list:
+            task = asyncio.create_task(self.parse_job(job))
+            tasks.append(task)
+        return await asyncio.gather(*tasks)
+
+    async def parse_job(self, job) -> JD:
+        jd = JD()
+        jd.id = job.get("encryptJobId")
+        jd.communicated = not job.get("contact", True)
+        if self.config.skip_known and self.check_jd_known(jd.id):
+            return None
+        row = self.get_jd(jd.id)
+        if row and row.id == jd.id:
+            if row.communicated or row.level == Level.COMMUNICATE.value:
+                return None
+            jd = row
+        jd.url = f"{self.URL8}{jd.id}{self.URL9}"
+        jd.name = job.get("jobName")
+        jd.city = job.get("cityName")
+        jd.company = job.get("brandName")
+        jd.industry = job.get("brandIndustry")
+        jd.scale = job.get("brandScaleName", "")
+        jd.address = f"{job.get('cityName', '')} {job.get('areaDistrict', '')} {job.get('businessDistrict', '')}"
+        jd.experience = job.get("jobExperience")
+        jd.degree = job.get("jobDegree")
+        jd.salary = job.get("salaryDesc") or job.get("jobSalary")
+        jd.boss = job.get("bossName")
+        jd.boss_title = job.get("bossTitle")
+        jd.boss_id = job.get("encryptBossId")
+        jd.skill = set(job.get("skills", []))
+        jd.type = jobType.get(job.get("jobType"))
+        jd.proxy = job.get("proxyJob")
+        last_modify_time = job.get("lastModifyTime")
+        if last_modify_time and isinstance(last_modify_time, (int, float)):
+            jd.update_date = arrow.Arrow.fromtimestamp(last_modify_time / 1000).date()
+        jd.level = Level.LIST.value
+        self.executor.submit(self.save_jd, jd)
+        if jd and self.check_jd_stage(jd, Level.LIST.value):
+            return f"{jd.url}?securityId={job.get('securityId')}"
 
     def parse_detail(self, json_str) -> bool:
         data = json.loads(json_str)
@@ -171,7 +179,7 @@ class ZhiPinBase(Base):
         jd.industry = brand_com_info["industryName"]
         jd.company_introduce = brand_com_info["introduce"]
         jd.level = self.check_jd(jd)
-        self.save_jd(jd)
+        self.executor.submit(self.save_jd, jd)
         return jd.level == Level.COMMUNICATE.value
 
     def check_jd(self, jd: JD) -> str:
@@ -309,7 +317,7 @@ class ZhiPinBase(Base):
             return True
         else:
             jd.communicated = True
-            self.save_jd(jd)
+            self.executor.submit(self.save_jd, jd)
             return False
 
     def get_encryptJobId(self, url: str) -> str:

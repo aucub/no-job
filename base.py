@@ -4,8 +4,10 @@ from typing import Optional
 from loguru import logger
 from config import load_config
 from dotenv import load_dotenv
-from pymongo.mongo_client import MongoClient
+from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo.server_api import ServerApi
+from concurrent.futures import ThreadPoolExecutor
+
 
 load_dotenv()
 
@@ -18,9 +20,10 @@ class VerifyException(Exception):
 class Base:
     config = load_config()
     mongo_url = os.getenv("MONGO_URL")
-    mongo_client = MongoClient(host=mongo_url, server_api=ServerApi("1"))
+    mongo_client = AsyncIOMotorClient(host=mongo_url, server_api=ServerApi("1"))
     proxy = os.getenv("PROXY") or os.getenv("HTTP_PROXY") or None
     proxies = {"http": proxy, "https": proxy}
+    executor = ThreadPoolExecutor(max_workers=1)
 
     def __init__(self):
         logger.add(

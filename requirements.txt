@@ -1,7 +1,7 @@
 requests
 peewee
 PyMySQL[rsa]
-pymongo
+motor
 toml
 attrs
 loguru
