@@ -9,6 +9,7 @@ import atexit
 import time
 import cv2
 import arrow
+import asyncio
 from captcha import cracker
 from zhipin_base import ZhiPinBase, VerifyException
 from jd import JD, Level
@@ -210,6 +211,7 @@ class ZhiPinDrissionPage(ZhiPinBase):
         self.detail_list(url_list)
 
     def job_list(self, city, query, salary, page) -> list[str]:
+        self.page.set.load_mode.none()
         self.page.listen.start("wapi/zpgeek/search/joblist")
         self.page.get(
             self.URL1
@@ -236,6 +238,8 @@ class ZhiPinDrissionPage(ZhiPinBase):
             except (VerifyException, JSONDecodeError) as e:
                 self.handle_exception(e)
         self.page.listen.stop()
+        self.page.stop_loading()
+        self.page.set.load_mode.normal()
         if len(url_list) > 0:
             return url_list
         try:
@@ -271,7 +275,7 @@ class ZhiPinDrissionPage(ZhiPinBase):
                 jd.industry = element.ele("css:.company-tag-list    li").text
                 jd.checked_time = arrow.now().datetime
                 jd.level = Level.LIST.value
-                self.save_jd(jd)
+                self.executor.submit(self.save_jd, jd)
                 if self.check_jd_stage(jd, Level.LIST.value):
                     url_list.append(url)
             except ElementNotFoundError as e:
@@ -414,28 +418,39 @@ class ZhiPinDrissionPage(ZhiPinBase):
             self.page.change_mode(mode, False, False)
 
     def detail_list(self, url_list):
-        for url in url_list:
-            try:
-                self.change_page_mode("s")
-                if not self.detail(url):
-                    continue
-            except (JSONDecodeError, VerifyException, ElementNotFoundError) as e:
-                self.handle_exception(e)
-            self.change_page_mode("d")
-            self.dp_detail(url)
+        self.change_page_mode("s")
+        results = asyncio.run(self.detail_s_list(url_list))
         self.change_page_mode("d")
+        for url in results:
+            if url:
+                self.dp_detail(url)
 
-    def detail(self, url):
-        self.page.get(
-            self.URL16 + self.get_securityId(url),
-            proxies=self.proxies,
-        )
-        return self.parse_detail(self.page.raw_data)
+    async def detail_s_list(self, url_list):
+        tasks = []
+        for url in url_list:
+            task = asyncio.create_task(self.detail(url))
+            tasks.append(task)
+        return await asyncio.gather(*tasks)
+
+    async def detail(self, url):
+        try:
+            self.page.get(
+                self.URL16 + self.get_securityId(url),
+                proxies=self.proxies,
+            )
+            if not self.parse_detail(self.page.raw_data):
+                return None
+        except (JSONDecodeError, VerifyException, ElementNotFoundError) as e:
+            self.handle_exception(e)
+        return url
 
     def dp_detail(self, url):
+        self.page.set.load_mode.none()
         jd = self.get_jd(self.get_encryptJobId(url))
         self.page.get(jd.url)
         try:
+            self.page.ele("职位描述")
+            self.page.stop_loading()
             element = self.page.ele("@|class=btn btn-more@|class=btn btn-startchat")
             jd.communicated = not self.contactable(element.text)
             if jd.communicated:
@@ -460,11 +475,12 @@ class ZhiPinDrissionPage(ZhiPinBase):
             except ElementNotFoundError as e:
                 self.handle_exception(e)
             jd.level = self.check_jd(jd)
-            self.save_jd(jd)
+            self.executor.submit(self.save_jd, jd)
         except ElementNotFoundError as e:
             self.handle_exception(e)
             self.check_dialog()
             self.check_verify()
+        self.page.set.load_mode.normal()
 
     def start_chat(self, url: str):
         self.page.get(url)
@@ -480,7 +496,7 @@ class ZhiPinDrissionPage(ZhiPinBase):
             or "页面不存在" in element.text
         ):
             jd.communicated = True
-            self.save_jd(jd)
+            self.executor.submit(self.save_jd, jd)
             return
         elif "异常" in element.text:
             raise ElementNotFoundError()
@@ -499,7 +515,7 @@ class ZhiPinDrissionPage(ZhiPinBase):
         if "已达上限" in find_element.text:
             sys.exit("已达上限")
         jd.communicated = True
-        self.save_jd(jd)
+        self.executor.submit(self.save_jd, jd)
         jd.description = description
         time.sleep(self.config.sleep)
         if chat_box and self.config.llm_chat:

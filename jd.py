@@ -29,7 +29,6 @@ db = MySQLDatabase(
     connect_timeout=10,
     read_timeout=20,
 )
-db.connect()
 
 
 class JD(Model):
