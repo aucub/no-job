@@ -236,15 +236,15 @@ class ZhiPinBase(Base):
         if failed_field:
             failed_fields.add(failed_field)
         # 检查 checks
-        for field, check in checks.get(stage, []):
+        for field, check in checks[stage]:
             if not check(jd):
                 failed_fields.add(field)
                 break
-        if failed_fields:
+        if len(failed_fields) > 0:
             jd.failed_fields = failed_fields
             return False
         elif stage == Level.DETAIL.value and jd.level == Level.COMMUNICATE.value:
-            jd._failed_fields = None
+            jd.failed_fields = set()
         return True
 
     def save_jd(self, jd: JD):
