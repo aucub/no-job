@@ -110,7 +110,7 @@ class Config:
         "1000-9999人",
         "10000人以上",
     ]
-    salary_list_ui: List = ["3-5K", "5-10K"]
+    salary_list_ui: List = ["3K以下", "3-5K", "5-10K"]
 
 
 def save_config(config: Config) -> None:

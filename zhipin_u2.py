@@ -23,7 +23,7 @@ class ZhiPinU2(ZhiPinBase):
     def __init__(self):
         ZhiPinBase.__init__(self)
         self.d = u2.connect()
-        self.d.implicitly_wait(self.config.timeout)
+        self.d.implicitly_wait(self.config.large_sleep)
         self.d.set_input_ime()
 
     def start_app(self):
@@ -227,7 +227,7 @@ class ZhiPinU2(ZhiPinBase):
             return
         self.d.click(*job_cards[0].center())
         previous_id = None
-        for _ in range(0, self.config.page_max * 30):
+        for _ in range(0, self.config.page_max * 3):
             try:
                 id = self.detail()
                 if id == previous_id:
@@ -236,6 +236,7 @@ class ZhiPinU2(ZhiPinBase):
                     previous_id = id
             except (UiObjectNotFoundError, TypeError) as e:
                 self.handle_exception(e)
+                self.to_down()
             self.to_left()
             time.sleep(self.config.small_sleep)
 

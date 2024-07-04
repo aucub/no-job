@@ -123,7 +123,9 @@ class ZhiPinDrissionPage(ZhiPinBase):
             self.config.query_token = True
         if self.config.query_token:
             self.cookies_page = ChromiumPage(
-                self.cookies_co,
+                self.cookies_co.remove_argument("--host-rules").set_argument(
+                    "--no-proxy-server"
+                ),
                 timeout=self.config.timeout,
             )
             self.switch_page(True)
@@ -156,7 +158,7 @@ class ZhiPinDrissionPage(ZhiPinBase):
             self.page.wait.url_change(
                 text="header-login",
                 exclude=True,
-                timeout=180,
+                timeout=360,
                 raise_err=False,
             )
 
@@ -210,7 +212,20 @@ class ZhiPinDrissionPage(ZhiPinBase):
             self.switch_page(False)
         self.detail_list(url_list)
 
+    def set_blocked_urls(self):
+        self.page.set.blocked_urls(
+            [
+                "https://static.zhipin.com/*.jpg",
+                "https://static.zhipin.com/*.png",
+                "https://www.zhipin.com/wapi/zpuser/wap/getSecurityGuideV1",
+                "https://www.zhipin.com/wapi/zpgeek/collection/popup/window",
+                "https://static.zhipin.com/library/js/sdk/verify-sdk-v2.3.js",
+                "https://static.zhipin.com/library/js/analytics/ka.zhipin.min.js",
+            ]
+        )
+
     def job_list(self, city, query, salary, page) -> list[str]:
+        self.set_blocked_urls()
         self.page.set.load_mode.none()
         self.page.listen.start("wapi/zpgeek/search/joblist")
         self.page.get(
@@ -246,6 +261,7 @@ class ZhiPinDrissionPage(ZhiPinBase):
             element_list = self.page.eles(
                 "@|class=job-card-wrapper@|class=job-empty-wrapper"
             )
+            self.page.set.blocked_urls(None)
         except ElementNotFoundError as e:
             self.handle_exception(e)
             self.check_dialog()
@@ -310,6 +326,7 @@ class ZhiPinDrissionPage(ZhiPinBase):
             self.handle_exception(e)
 
     def check_verify(self, verify_exception: bool = False):
+        self.page.set.blocked_urls(None)
         current_url = self.page.url
         captcha_result = False
         while "safe/verify-slider" in current_url and captcha_result is False:
@@ -337,6 +354,7 @@ class ZhiPinDrissionPage(ZhiPinBase):
                 WaitTimeoutError,
             ) as e:
                 self.handle_exception(e)
+                self.page.get(self.URL1)
         if "403.html" in current_url or "error.html" in current_url:
             self.page.get_screenshot(path="tmp", name="error.jpg", full_page=True)
             sys.exit("403或错误")
@@ -369,9 +387,6 @@ class ZhiPinDrissionPage(ZhiPinBase):
         self.page.ele(".geetest_item_wrap").get_screenshot(
             path=captcha_image_path, name="img_image.png", scroll_to_center=False
         )
-        if not (element.states.is_displayed and element.states.has_rect):
-            self.page.ele("css:.btn").click()
-            time.sleep(random.uniform(self.config.sleep, self.config.small_sleep))
         (element_width, element_height) = element.rect.size
         image = cv2.imread(captcha_image_path + "/" + "img_image.png")
         height, width, _ = image.shape
@@ -445,12 +460,14 @@ class ZhiPinDrissionPage(ZhiPinBase):
         return url
 
     def dp_detail(self, url):
+        self.set_blocked_urls()
         self.page.set.load_mode.none()
         jd = self.get_jd(self.get_encryptJobId(url))
         self.page.get(jd.url)
         try:
             self.page.ele("职位描述")
             self.page.stop_loading()
+            self.page.set.blocked_urls(None)
             element = self.page.ele("@|class=btn btn-more@|class=btn btn-startchat")
             jd.communicated = not self.contactable(element.text)
             if jd.communicated:
