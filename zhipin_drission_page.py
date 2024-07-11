@@ -123,9 +123,7 @@ class ZhiPinDrissionPage(ZhiPinBase):
             self.config.query_token = True
         if self.config.query_token:
             self.cookies_page = ChromiumPage(
-                self.cookies_co.remove_argument("--host-rules").set_argument(
-                    "--no-proxy-server"
-                ),
+                self.cookies_co.set_argument("--no-proxy-server"),
                 timeout=self.config.timeout,
             )
             self.switch_page(True)
@@ -142,6 +140,7 @@ class ZhiPinDrissionPage(ZhiPinBase):
             self.original_page = WebPage("d", self.config.timeout, self.co, self.so)
             self.switch_page(False)
             self.page.set.auto_handle_alert(accept=False, all_tabs=True)
+            self.set_blocked_urls()
             self.check_network_drission_page()
         if self.args.communicate:
             self.test_communicate()
@@ -225,7 +224,6 @@ class ZhiPinDrissionPage(ZhiPinBase):
         )
 
     def job_list(self, city, query, salary, page) -> list[str]:
-        self.set_blocked_urls()
         self.page.set.load_mode.none()
         self.page.listen.start("wapi/zpgeek/search/joblist")
         self.page.get(
@@ -261,15 +259,15 @@ class ZhiPinDrissionPage(ZhiPinBase):
             element_list = self.page.eles(
                 "@|class=job-card-wrapper@|class=job-empty-wrapper"
             )
-            self.page.set.blocked_urls(None)
+            if len(element_list) == 0:
+                raise ElementNotFoundError()
         except ElementNotFoundError as e:
             self.handle_exception(e)
             self.check_dialog()
             self.check_verify(verify_exception=True)
             return url_list
-        if len(element_list) > 0:
-            if "没有找到相关职位" in element_list[0].text:
-                return url_list
+        if "没有找到相关职位" in element_list[0].text:
+            return url_list
         for element in element_list:
             try:
                 jd = JD()
@@ -326,7 +324,6 @@ class ZhiPinDrissionPage(ZhiPinBase):
             self.handle_exception(e)
 
     def check_verify(self, verify_exception: bool = False):
-        self.page.set.blocked_urls(None)
         current_url = self.page.url
         captcha_result = False
         while "safe/verify-slider" in current_url and captcha_result is False:
@@ -460,14 +457,12 @@ class ZhiPinDrissionPage(ZhiPinBase):
         return url
 
     def dp_detail(self, url):
-        self.set_blocked_urls()
         self.page.set.load_mode.none()
         jd = self.get_jd(self.get_encryptJobId(url))
-        self.page.get(jd.url)
+        self.page.get(url)
         try:
             self.page.ele("职位描述")
             self.page.stop_loading()
-            self.page.set.blocked_urls(None)
             element = self.page.ele("@|class=btn btn-more@|class=btn btn-startchat")
             jd.communicated = not self.contactable(element.text)
             if jd.communicated:

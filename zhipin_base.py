@@ -7,7 +7,7 @@ import arrow
 import peewee
 import asyncio
 from typing import Callable, Dict, List, Tuple
-from jd import JD, Level, jobType
+from jd import JD, Level
 from base import Base, VerifyException
 from ai import LLM
 from urllib.parse import parse_qs, urlparse
@@ -104,7 +104,7 @@ class ZhiPinBase(Base):
     async def parse_job(self, job) -> JD:
         jd = JD()
         jd.id = job.get("encryptJobId")
-        jd.communicated = not job.get("contact", True)
+        jd.communicated = job.get("contact", False)
         if self.config.skip_known and self.check_jd_known(jd.id):
             return None
         row = self.get_jd(jd.id)
@@ -126,8 +126,6 @@ class ZhiPinBase(Base):
         jd.boss_title = job.get("bossTitle")
         jd.boss_id = job.get("encryptBossId")
         jd.skill = set(job.get("skills", []))
-        jd.type = jobType.get(job.get("jobType"))
-        jd.proxy = job.get("proxyJob")
         last_modify_time = job.get("lastModifyTime")
         if last_modify_time and isinstance(last_modify_time, (int, float)):
             jd.update_date = arrow.Arrow.fromtimestamp(last_modify_time / 1000).date()
@@ -163,10 +161,7 @@ class ZhiPinBase(Base):
         jd.degree = job_info["degreeName"]
         jd.salary = job_info["salaryDesc"]
         jd.position = job_info["positionName"]
-        jd.type = jobType.get(job_info["jobType"], None)
-        jd.proxy = job_info["proxyJob"]
         jd.boss_id = job_info["encryptUserId"]
-        jd.pay_type = job_info["payTypeDesc"]
         jd.skill = set(job_info["showSkills"])
         if "新" in job_info["jobStatusDesc"]:
             jd.update_date = arrow.now().date()
@@ -177,7 +172,6 @@ class ZhiPinBase(Base):
         jd.scale = brand_com_info["scaleName"]
         jd.company = brand_com_info["brandName"]
         jd.industry = brand_com_info["industryName"]
-        jd.company_introduce = brand_com_info["introduce"]
         jd.level = self.check_jd(jd)
         self.executor.submit(self.save_jd, jd)
         return jd.level == Level.COMMUNICATE.value

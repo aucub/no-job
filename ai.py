@@ -50,8 +50,6 @@ class LLM:
         )
         if jd.skill:
             prompt += "\n要求技能：" + str(jd.skill)
-        if jd.company_introduce:
-            prompt += "\n公司介绍：" + jd.company_introduce
         result = self.send(prompt)
         if result and isinstance(result, str):
             return "true" in result.lower()

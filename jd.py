@@ -36,9 +36,6 @@ class JD(Model):
     url = CharField(max_length=255, null=True)
     name = CharField(max_length=255, null=True)
     position = CharField(max_length=255, null=True)
-    type = CharField(max_length=255, null=True)
-    proxy = BooleanField(null=True)
-    pay_type = CharField(max_length=255, null=True)
     city = CharField(max_length=100, null=True)
     address = CharField(max_length=255, null=True)
     guide = CharField(max_length=255, null=True)
@@ -48,7 +45,6 @@ class JD(Model):
     experience = CharField(max_length=100, null=True)
     degree = CharField(max_length=50, null=True)
     company = CharField(max_length=255, null=True)
-    company_introduce = TextField(null=True)
     industry = CharField(max_length=255, null=True)
     fund = CharField(max_length=255, null=True)
     res = DateField(null=True)
@@ -82,7 +78,6 @@ class JD(Model):
 
     class Meta:
         database = db
-        indexes = ((("id", "_failed_fields"), True),)
 
     def reconnect():
         JD._meta.database.close()
@@ -95,9 +90,3 @@ class Level(Enum):
     CARD = "card"
     DETAIL = "detail"
     COMMUNICATE = "communicate"
-
-
-jobType = {
-    4: "实习",
-    6: "兼职",
-}

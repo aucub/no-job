@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 from typing import Optional
 from loguru import logger
 from config import load_config
@@ -50,8 +51,16 @@ class Base:
                 if hasattr(value, "lower"):
                     value = value.lower()
                 block_list = getattr(self.config, key + "_block_list", [])
-                if any(item in value for item in block_list):
-                    return key
+                for item in block_list:
+                    if item in value:
+                        print(
+                            json.dumps(
+                                {"检查字段": key, "字段": value, "包含": item},
+                                ensure_ascii=False,
+                                indent=4,
+                            )
+                        )
+                        return key
         return None
 
     @logger.catch
