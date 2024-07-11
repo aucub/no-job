@@ -1,7 +1,7 @@
 /*
- Navicat Premium Data Transfer
+ Navicat Premium Dump SQL
 
- Source Server         : TiDB
+ Source Server         : TIDB
  Source Server Type    : MySQL
  Source Server Version : 50728 (5.7.28-TiDB-Serverless)
  Source Host           : gateway01.ap-southeast-1.prod.aws.tidbcloud.com:4000
@@ -11,7 +11,7 @@
  Target Server Version : 50728 (5.7.28-TiDB-Serverless)
  File Encoding         : 65001
 
- Date: 14/05/2024 07:11:14
+ Date: 11/07/2024 11:29:28
 */
 
 SET NAMES utf8mb4;
@@ -26,9 +26,6 @@ CREATE TABLE `jd` (
   `url` varchar(255) DEFAULT NULL,
   `name` varchar(255) DEFAULT NULL,
   `position` varchar(255) DEFAULT NULL,
-  `type` varchar(255) DEFAULT NULL,
-  `proxy` tinyint(1) DEFAULT NULL,
-  `pay_type` varchar(255) DEFAULT NULL,
   `city` varchar(100) DEFAULT NULL,
   `address` varchar(255) DEFAULT NULL,
   `guide` varchar(255) DEFAULT NULL,
@@ -38,7 +35,6 @@ CREATE TABLE `jd` (
   `experience` varchar(100) DEFAULT NULL,
   `degree` varchar(50) DEFAULT NULL,
   `company` varchar(255) DEFAULT NULL,
-  `company_introduce` text DEFAULT NULL,
   `industry` varchar(255) DEFAULT NULL,
   `fund` varchar(255) DEFAULT NULL,
   `res` date DEFAULT NULL,
