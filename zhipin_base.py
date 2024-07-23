@@ -87,7 +87,9 @@ class ZhiPinBase(Base):
         if data.get("message") != "Success":
             raise VerifyException(data)
         self.mongo["joblist"].insert_one(data)
-        job_list = data["zpData"].get("jobList", [])
+        job_list = data["zpData"].get("jobList")
+        if not job_list:
+            self.page_count = 0
         results = asyncio.run(self.parse_job_tasks(job_list))
         for url in results:
             if url:
@@ -244,17 +246,19 @@ class ZhiPinBase(Base):
     def save_jd(self, jd: JD):
         if jd.id:
             jd.checked_time = arrow.Arrow.now().datetime
-            try:
-                n = jd.save(force_insert=False)
-                if n == 0:
-                    jd.save(force_insert=True)
-            except (
-                peewee.OperationalError,
-                peewee.IntegrityError,
-                peewee.InterfaceError,
-            ) as e:
-                self.handle_exception(e)
-                JD.reconnect()
+            for _ in range(self.config.max_retries):
+                try:
+                    n = jd.save(force_insert=False)
+                    if n == 0:
+                        jd.save(force_insert=True)
+                    break
+                except (
+                    peewee.OperationalError,
+                    peewee.IntegrityError,
+                    peewee.InterfaceError,
+                ) as e:
+                    self.handle_exception(e)
+                    JD.reconnect()
             print(jd.__data__)
 
     def get_jd(self, id) -> JD:

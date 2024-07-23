@@ -177,7 +177,7 @@ class ZhiPinDrissionPage(ZhiPinBase):
         """
         检查网络
         """
-        self.page.get(self.URL1)
+        self.page.get(self.URL1 + "测试")
         try:
             self.page.wait.eles_loaded(
                 locators=[
@@ -267,7 +267,10 @@ class ZhiPinDrissionPage(ZhiPinBase):
             self.check_verify(verify_exception=True)
             return url_list
         if "没有找到相关职位" in element_list[0].text:
+            self.page_count = page - 1
             return url_list
+        self.page.set.scroll.smooth(on_off=False)
+        self.page.scroll.to_bottom()
         for element in element_list:
             try:
                 jd = JD()
