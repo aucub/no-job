@@ -87,7 +87,9 @@ class ZhiPinBase(Base):
         if data.get("message") != "Success":
             raise VerifyException(data)
         self.mongo["joblist"].insert_one(data)
-        job_list = data["zpData"].get("jobList", [])
+        job_list = data["zpData"].get("jobList")
+        if not job_list:
+            self.page_count = 0
         results = asyncio.run(self.parse_job_tasks(job_list))
         for url in results:
             if url:
