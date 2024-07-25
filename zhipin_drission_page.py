@@ -232,7 +232,7 @@ class ZhiPinDrissionPage(ZhiPinBase):
         return self.parse_joblist(self.page.ele("tag:pre").text)
 
     def job_list(self, city, query, salary, page) -> list[str]:
-        if not self.config.query_token and random.random() > 0.25:
+        if (not self.config.query_token) and random.random() > 0.25:
             try:
                 return self.job_s_list(city, query, salary, page)
             except (VerifyException, JSONDecodeError) as e:

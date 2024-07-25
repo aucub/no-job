@@ -76,6 +76,7 @@ class Config:
     description_experience_block_list: List = []  # 描述经验阻止名单
     description_experience_list: List = []  # 描述经验名单
     query_list: List = []
+    extra_query_list: List = []
     query_city_list: List = ["100010000"]
     query_param: str = "&experience=101,102,103,104&scale=302,303,304,305,306&degree=209,208,206,202,203"
     salary_list: List = ["404", "403"]

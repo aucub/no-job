@@ -51,6 +51,8 @@ class ZhiPinBase(Base):
         r.raise_for_status()
 
     def iterate_query_parameters(self):
+        if not self.config.query_token:
+            self.config.query_list.extend(self.config.extra_query_list)
         for city in self.config.query_city_list:
             if city in self.wheels[0]:
                 continue
