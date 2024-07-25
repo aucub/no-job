@@ -137,6 +137,10 @@ class ZhiPinDrissionPage(ZhiPinBase):
             if self.proxy:
                 self.co.set_proxy(self.proxy)
                 self.so.set_proxies(self.proxy, self.proxy)
+            if os.environ.get("CI"):
+                self.co.set_argument("--disable-gpu").set_argument(
+                    "--disable-software-rasterizer"
+                ).remove_extensions().ignore_certificate_errors()
             self.original_page = WebPage("d", self.config.timeout, self.co, self.so)
             self.switch_page(False)
             self.page.set.auto_handle_alert(accept=False, all_tabs=True)
@@ -223,7 +227,26 @@ class ZhiPinDrissionPage(ZhiPinBase):
             ]
         )
 
+    def job_s_list(self, city, query, salary, page) -> list[str]:
+        self.page.get(
+            self.URL12
+            + query
+            + self.URL7
+            + city
+            + "&salary="
+            + salary
+            + self.URL3
+            + str(page)
+            + self.config.query_param
+        )
+        return self.parse_joblist(self.page.ele("tag:pre").text)
+
     def job_list(self, city, query, salary, page) -> list[str]:
+        if not self.config.query_token and random.random() > 0.25:
+            try:
+                return self.job_s_list(city, query, salary, page)
+            except (VerifyException, JSONDecodeError) as e:
+                self.handle_exception(e)
         self.page.set.load_mode.none()
         self.page.listen.start("wapi/zpgeek/search/joblist")
         self.page.get(

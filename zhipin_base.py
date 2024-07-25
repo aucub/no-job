@@ -25,7 +25,7 @@ class ZhiPinBase(Base):
     URL9 = ".html"
     URL10 = "?lid="
     URL11 = "&securityId="
-    URL12 = "https://www.zhipin.com/wapi/zpgeek/search/joblist.json?scene=1&payType=&partTime=&stage=&jobType=&multiBusinessDistrict=&multiSubway=&pageSize=30&query="
+    URL12 = "https://www.zhipin.com/wapi/zpgeek/search/joblist.json?scene=1&pageSize=30&query="
     URL13 = "https://www.zhipin.com/web/user/safe/verify-slider"
     URL14 = "https://www.zhipin.com/"
     URL15 = "https://www.zhipin.com/web/user/?ka=header-login"
