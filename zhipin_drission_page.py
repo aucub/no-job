@@ -40,9 +40,6 @@ class ZhiPinDrissionPage(ZhiPinBase):
             action="store_true",
             help="Enable communicate option",
         )
-        parser.add_argument(
-            "--headless", action="store_true", help="Enable headless option"
-        )
         user_cache_directory = os.path.expanduser("~") + "/.cache/"
         parser.add_argument(
             "-p",
@@ -53,17 +50,10 @@ class ZhiPinDrissionPage(ZhiPinBase):
         self.args = parser.parse_args()
         ZhiPinBase.__init__(self)
         atexit.register(self.cleanup_drission_page)
-        if os.environ.get("CI") or (
-            hasattr(self.args, "headless") and self.args.headless
-        ):
-            self.headless = True
-        else:
-            self.headless = False
         self.cookies_co = (
             ChromiumOptions(read_file=False)
             .set_timeouts(self.config.timeout)
             .set_retry(self.config.max_retries)
-            .headless(self.headless)
             .set_paths(user_data_path=self.args.data_path)
             .set_pref("credentials_enable_service", False)
             .set_pref("enable_do_not_track", True)
@@ -140,6 +130,8 @@ class ZhiPinDrissionPage(ZhiPinBase):
             if os.environ.get("CI"):
                 self.co.set_argument("--disable-gpu").set_argument(
                     "--disable-software-rasterizer"
+                ).set_argument("--dns-prefetch-disable").set_argument(
+                    "--disable-browser-side-navigation"
                 ).remove_extensions().ignore_certificate_errors()
             self.original_page = WebPage("d", self.config.timeout, self.co, self.so)
             self.switch_page(False)
@@ -154,8 +146,6 @@ class ZhiPinDrissionPage(ZhiPinBase):
     def login(self):
         self.page.get(self.URL14)
         while not self.check_login():
-            if self.headless:
-                sys.exit("隐藏浏览器界面无法登录")
             self.page.get(self.URL15)
             self.page.ele(".btn-sign-switch ewm-switch").click()
             self.page.wait.url_change(
