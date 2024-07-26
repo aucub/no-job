@@ -284,6 +284,26 @@ class ZhiPinDrissionPage(ZhiPinBase):
             return url_list
         self.page.set.scroll.smooth(on_off=False)
         self.page.scroll.to_bottom()
+        if page == 1:
+            try:
+                options_pages = self.page.ele(
+                    ".options-pages", timeout=self.config.small_sleep
+                )
+                options_page_list = options_pages.children(
+                    "tag:a", timeout=self.config.small_sleep
+                )
+                page_count = 0
+                for options_page in options_page_list:
+                    if (
+                        len(options_page.text) > 0
+                        and options_page.text.isdecimal()
+                        and int(options_page.text) > page_count
+                    ):
+                        page_count = int(options_page.text)
+                if page_count < 10:
+                    self.page_count = page_count
+            except ElementNotFoundError as e:
+                self.handle_exception(e)
         for element in element_list:
             try:
                 jd = JD()
