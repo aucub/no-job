@@ -17,6 +17,7 @@ class Config:
     timeout: int = 40
     sleep: float = 0.0
     small_sleep: float = 2.0
+    small_sleep_ui: float = 1.0
     large_sleep: float = 7.0
     max_retries: int = 3
     llm_chat: bool = False
@@ -102,7 +103,6 @@ class Config:
         "重庆",
     ]
     query_label_list_ui: List = [
-        "高中",
         "1-3年",
         Direction.UP.value,
         "20-99人",
@@ -110,6 +110,9 @@ class Config:
         "500-999人",
         "1000-9999人",
         "10000人以上",
+    ]
+    query_degree_list_ui: List = [
+        "高中",
     ]
     salary_list_ui: List = ["3K以下", "3-5K", "5-10K"]
 

@@ -1,10 +1,11 @@
+import argparse
 import json
 import re
 import time
 import datetime
 import arrow
 import uiautomator2 as u2
-from jd import JD, Level
+from jd import JD
 from config import Direction
 from zhipin_base import ZhiPinBase
 from uiautomator2.exceptions import UiObjectNotFoundError
@@ -14,17 +15,38 @@ class ZhiPinU2(ZhiPinBase):
     def to_up(self):
         self.d.swipe(0.47, 0.86, 0.45, 0.26)
 
+    def to_up_half(self):
+        self.d.swipe(0.47, 0.86, 0.45, 0.50)
+
     def to_down(self):
         self.d.swipe(0.48, 0.25, 0.43, 0.89)
+
+    def to_down_half(self):
+        self.d.swipe(0.48, 0.25, 0.43, 0.59)
 
     def to_left(self):
         self.d.swipe(0.91, 0.45, 0.05, 0.43)
 
+    def to_right(self):
+        self.d.swipe(0.05, 0.43, 0.91, 0.45)
+
     def __init__(self):
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "-m",
+            "--mode",
+            help="Query mode",
+            default="query",
+        )
+        self.args = parser.parse_args()
         ZhiPinBase.__init__(self)
         self.d = u2.connect()
         self.d.implicitly_wait(self.config.large_sleep)
         self.d.set_input_ime()
+        if self.args.mode == "query":
+            self.test_query()
+        elif self.args.mode == "seen":
+            self.test_seen()
 
     def start_app(self):
         self.d.app_start("com.hpbr.bosszhipin")
@@ -32,7 +54,7 @@ class ZhiPinU2(ZhiPinBase):
 
     def stop_app(self):
         self.d.app_stop("com.hpbr.bosszhipin")
-        time.sleep(self.config.small_sleep)
+        time.sleep(self.config.small_sleep_ui)
 
     def iterate_query_parameters(self):
         for city in self.config.query_city_list_ui:
@@ -101,28 +123,35 @@ class ZhiPinU2(ZhiPinBase):
         jd.name = self.d(resourceId="com.hpbr.bosszhipin:id/tv_job_name").get_text()
         jd.boss = self.d(resourceId="com.hpbr.bosszhipin:id/tv_boss_name").get_text()
         self.d(resourceId="com.hpbr.bosszhipin:id/iv_share").click()
-        time.sleep(self.config.small_sleep)
+        time.sleep(self.config.small_sleep_ui)
         self.d(resourceId="com.hpbr.bosszhipin:id/tv_share_link").click()
-        time.sleep(self.config.small_sleep)
+        time.sleep(self.config.small_sleep_ui)
         url = self.d.clipboard
         jd.id = self.get_encryptJobId(url)
         jd.url = self.URL8 + jd.id + self.URL9
         jd.communicated = self.d(text="继续沟通").exists()
-        if self.config.skip_known and self.check_jd_known(jd.id):
+        row = self.get_jd_unknown(jd.id)
+        if row is None:
             return jd.id
-        row = self.get_jd(jd.id)
-        if row and row.id == jd.id:
+        else:
             jd = row
-            if row.communicated or row.level == Level.COMMUNICATE.value:
-                return jd.id
-        jd.city = self.city
+        jd.city = (
+            self.d(resourceId="com.hpbr.bosszhipin:id/tv_required_location")
+            .get_text()
+            .split("·")[0]
+            .strip()
+        )
         jd.salary = self.d(resourceId="com.hpbr.bosszhipin:id/tv_job_salary").get_text()
         jd.address = self.d(
             resourceId="com.hpbr.bosszhipin:id/tv_required_location"
         ).get_text()
-        jd.experience = self.d(
+        tv_required_work_exp = self.d(
             resourceId="com.hpbr.bosszhipin:id/tv_required_work_exp"
         ).get_text()
+        if "天/周" in tv_required_work_exp:
+            jd.experience = "在校/应届"
+        else:
+            jd.experience = tv_required_work_exp
         jd.degree = self.d(
             resourceId="com.hpbr.bosszhipin:id/tv_required_degree"
         ).get_text()
@@ -147,14 +176,13 @@ class ZhiPinU2(ZhiPinBase):
         )  # 标签
         for btn_word in btn_words:
             words = words + btn_word.get_text()
-        if self.d(resourceId="com.hpbr.bosszhipin:id/tv_com_name").exists():
-            self.d.swipe(0.47, 0.86, 0.45, 0.56)  # 上滑一半
-        else:
+        for _ in range(0, 3):
             self.to_up()
-        see_more = self.d(text="查看更多")
-        if see_more.exists():
-            see_more.click()
-            time.sleep(self.config.small_sleep)
+        for _ in range(0, 3):
+            self.to_down_half()
+            if self.d(resourceId="com.hpbr.bosszhipin:id/tv_com_name").exists:
+                break
+        time.sleep(self.config.small_sleep_ui)
         jd.description = (
             words
             + self.d(resourceId="com.hpbr.bosszhipin:id/tv_description").get_text()
@@ -179,36 +207,40 @@ class ZhiPinU2(ZhiPinBase):
         time.sleep(self.config.large_sleep)
         self.d.click(0.92, 0.07)
         self.d(resourceId="com.hpbr.bosszhipin:id/et_search").set_text(query)
-        time.sleep(self.config.small_sleep)
+        time.sleep(self.config.small_sleep_ui)
         self.d(resourceId="com.hpbr.bosszhipin:id/tv_search").click()
         self.d(resourceId="com.hpbr.bosszhipin:id/view_job_card")
         tab_labels = self.d(resourceId="com.hpbr.bosszhipin:id/tv_tab_label")
         tab_labels[3].click()
-        time.sleep(self.config.small_sleep)
+        time.sleep(self.config.small_sleep_ui)
         self.d(resourceId="com.hpbr.bosszhipin:id/tv_btn_action").click()
         time.sleep(self.config.large_sleep)
         try:
             self.d(text=city).click()
         except UiObjectNotFoundError as e:
             self.d(resourceId="com.hpbr.bosszhipin:id/iv_back").click()
-            time.sleep(self.config.small_sleep)
+            time.sleep(self.config.small_sleep_ui)
             self.d(resourceId="com.hpbr.bosszhipin:id/iv_back").click()
             self.handle_exception(e)
-        time.sleep(self.config.small_sleep)
-        self.d(resourceId="com.hpbr.bosszhipin:id/view_job_card")
+        time.sleep(self.config.small_sleep_ui)
+        self.d(resourceId="com.hpbr.bosszhipin:id/view_job_card").wait()
         tab_labels[5].click()
-        self.d(resourceId="com.hpbr.bosszhipin:id/btn_confirm")
+        self.d(resourceId="com.hpbr.bosszhipin:id/btn_confirm").wait()
         try:
             for label in self.config.query_label_list_ui:
                 if Direction.UP.value in label:
                     self.to_up()
-                    time.sleep(self.config.small_sleep)
+                    time.sleep(self.config.small_sleep_ui)
                     continue
                 self.d(text=label).click()
+                time.sleep(self.config.small_sleep_ui / 4)
             self.to_down()
-            time.sleep(self.config.small_sleep)
+            time.sleep(self.config.small_sleep_ui)
             self.d(text=salary).click()
-            time.sleep(self.config.small_sleep)
+            time.sleep(self.config.small_sleep_ui)
+            for degree in self.config.query_degree_list_ui:
+                self.d(text=degree).click()
+                time.sleep(self.config.small_sleep_ui / 4)
             self.d(resourceId="com.hpbr.bosszhipin:id/btn_confirm").click()
         except UiObjectNotFoundError as e:
             self.d(resourceId="com.hpbr.bosszhipin:id/iv_back").click()
@@ -238,13 +270,46 @@ class ZhiPinU2(ZhiPinBase):
                 self.handle_exception(e)
                 self.to_down()
             self.to_left()
-            time.sleep(self.config.small_sleep)
+            time.sleep(self.config.small_sleep_ui)
 
     def test_query(self):
-        self.config.small_sleep = 1.0
         self.iterate_query_parameters()
+
+    def test_seen(self):
+        self.stop_app()
+        self.start_app()
+        self.d(resourceId="com.hpbr.bosszhipin:id/tv_tab_3").click()
+        time.sleep(self.config.small_sleep_ui)
+        self.d(resourceId="com.hpbr.bosszhipin:id/magic_indicator").wait()
+        self.d(resourceId="com.hpbr.bosszhipin:id/magic_indicator").child(
+            text="互动"
+        ).click()
+        self.d(resourceId="com.hpbr.bosszhipin:id/mRecycleView").wait()
+        time.sleep(self.config.small_sleep_ui)
+        self.d(resourceId="com.hpbr.bosszhipin:id/mRecycleView").child(
+            text="看过我"
+        ).click()
+        for _ in range(0, self.config.page_max * 10):
+            time.sleep(self.config.large_sleep)
+            self.to_up()
+            time.sleep(self.config.small_sleep_ui)
+            self.to_up_half()
+            time.sleep(self.config.small_sleep_ui)
+            self.d(resourceId="com.hpbr.bosszhipin:id/cl_card_container").click()
+            for _ in range(0, 3):
+                try:
+                    self.detail()
+                except (UiObjectNotFoundError, TypeError) as e:
+                    self.handle_exception(e)
+                    self.to_down()
+                self.to_left()
+                time.sleep(self.config.small_sleep_ui)
+            self.d.press("back")
+            time.sleep(self.config.small_sleep_ui)
+            self.to_down()
+            time.sleep(self.config.small_sleep_ui)
+            self.to_down()
 
 
 if __name__ == "__main__":
     zp_u2 = ZhiPinU2()
-    zp_u2.test_query()

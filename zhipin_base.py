@@ -94,7 +94,7 @@ class ZhiPinBase(Base):
             self.page_count = 0
         results = asyncio.run(self.parse_job_tasks(job_list))
         for url in results:
-            if url:
+            if url and url is str and "http" in url:
                 url_list.append(url)
         return url_list
 
@@ -109,12 +109,10 @@ class ZhiPinBase(Base):
         jd = JD()
         jd.id = job.get("encryptJobId")
         jd.communicated = job.get("contact", False)
-        if self.config.skip_known and self.check_jd_known(jd.id):
-            return None
-        row = self.get_jd(jd.id)
-        if row and row.id == jd.id:
-            if row.communicated or row.level == Level.COMMUNICATE.value:
-                return None
+        row = self.get_jd_unknown(jd.id)
+        if row is None:
+            return
+        else:
             jd = row
         jd.url = f"{self.URL8}{jd.id}{self.URL9}"
         jd.name = job.get("jobName")
@@ -262,6 +260,18 @@ class ZhiPinBase(Base):
                     self.handle_exception(e)
                     JD.reconnect()
             print(jd.__data__)
+
+    def get_jd_unknown(self, id) -> JD:
+        if self.config.skip_known and self.check_jd_known(id):
+            return None
+        row = self.get_jd(id)
+        if (
+            row
+            and row.id == id
+            and (row.communicated or row.level == Level.COMMUNICATE.value)
+        ):
+            return None
+        return row
 
     def get_jd(self, id) -> JD:
         try:

@@ -20,6 +20,7 @@ from DrissionPage.errors import (
     NoRectError,
     ElementLostError,
     WaitTimeoutError,
+    WrongURLError,
 )
 from collections.abc import Iterable
 from json.decoder import JSONDecodeError
@@ -278,10 +279,10 @@ class ZhiPinDrissionPage(ZhiPinBase):
             self.handle_exception(e)
             self.check_dialog()
             self.check_verify(verify_exception=True)
-            return url_list
+            return []
         if "没有找到相关职位" in element_list[0].text:
             self.page_count = page - 1
-            return url_list
+            return []
         self.page.set.scroll.smooth(on_off=False)
         self.page.scroll.to_bottom()
         if page == 1:
@@ -311,12 +312,10 @@ class ZhiPinDrissionPage(ZhiPinBase):
                 jd.communicated = not self.contactable(job_info_html)
                 url = element.ele("css:.job-card-left").property("href")
                 jd.id = self.get_encryptJobId(url)
-                if self.config.skip_known and self.check_jd_known(jd.id):
+                row = self.get_jd_unknown(jd.id)
+                if row is None:
                     continue
-                row = self.get_jd(jd.id)
-                if row and row.id == jd.id:
-                    if row.communicated or row.level == Level.COMMUNICATE.value:
-                        continue
+                else:
                     jd = row
                 jd.url = url.split("&securityId")[0]
                 jd.name = element.ele("css:.job-name").text
@@ -495,8 +494,8 @@ class ZhiPinDrissionPage(ZhiPinBase):
     def dp_detail(self, url):
         self.page.set.load_mode.none()
         jd = self.get_jd(self.get_encryptJobId(url))
-        self.page.get(url)
         try:
+            self.page.get(url)
             self.page.ele("职位描述")
             self.page.stop_loading()
             element = self.page.ele("@|class=btn btn-more@|class=btn btn-startchat")
@@ -524,7 +523,7 @@ class ZhiPinDrissionPage(ZhiPinBase):
                 self.handle_exception(e)
             jd.level = self.check_jd(jd)
             self.executor.submit(self.save_jd, jd)
-        except ElementNotFoundError as e:
+        except (ElementNotFoundError, WrongURLError) as e:
             self.handle_exception(e)
             self.check_dialog()
             self.check_verify()
