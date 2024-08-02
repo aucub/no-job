@@ -1,21 +1,45 @@
-import json
+from collections.abc import Iterable
 import os
 import re
-import requests
-import datetime
+import sys
+import json
 import arrow
 import peewee
 import asyncio
-from typing import Callable, Dict, List, Tuple
-from jd import JD, Level
-from base import Base, VerifyException
+import requests
+import datetime
+import argparse
 from ai import LLM
+from loguru import logger
+from typing import Optional
+from dotenv import load_dotenv
+from config import load_config
+from jd import JD, Level
+from typing import Callable, Dict, List, Tuple
+from pymongo.server_api import ServerApi
 from urllib.parse import parse_qs, urlparse
+from concurrent.futures import ThreadPoolExecutor
+from motor.motor_asyncio import AsyncIOMotorClient
+
+load_dotenv()
 
 
-class ZhiPinBase(Base):
+class VerifyException(Exception):
+    def __init__(self, message=None):
+        self.message = message
+
+
+class ZhiPinBase:
+    parser = argparse.ArgumentParser()
+    config = load_config()
+    mongo = AsyncIOMotorClient(host=os.getenv("MONGO_URL"), server_api=ServerApi("1"))[
+        "zpgeek_job"
+    ]
+    proxy = os.getenv("PROXY") or os.getenv("HTTP_PROXY") or None
+    executor = ThreadPoolExecutor(max_workers=1)
     URL0 = "https://www.zhipin.com/"
     URL1 = "https://www.zhipin.com/web/geek/job?query="
+    URL2 = config.query_param + "&salary="
     URL3 = "&page="
     URL4 = "https://www.zhipin.com/wapi/zpgeek/job/card.json?securityId="
     URL5 = "&lid="
@@ -32,13 +56,42 @@ class ZhiPinBase(Base):
     URL16 = "https://www.zhipin.com/wapi/zpgeek/job/detail.json?securityId="
 
     def __init__(self):
-        Base.__init__(self)
-        self.URL2 = self.config.query_param + "&salary="
-        self.mongo = self.mongo_client["zpgeek_job"]
-        self.check_network()
-        self.wheels = self.load_state()
+        logger.add(
+            sys.stdout,
+            colorize=True,
+            format="<green>{time:YYYY-MM-DD at HH:mm:ss}</green> | <level>{message}</level>",
+        )
+        logger.add(
+            "out.log",
+            retention="1 days",
+            enqueue=True,
+            backtrace=True,
+            diagnose=True,
+        )
+        self.parser.add_argument(
+            "--communicate",
+            action="store_true",
+            help="Enable communicate option",
+        )
+        self.parser.add_argument(
+            "-eq",
+            "--extra_query",
+            action="store_true",
+            help="Enable extra query list",
+        )
+        self.parser.add_argument(
+            "-p",
+            "--data_path",
+            help="Data path",
+            default=os.path.expanduser("~") + "/.cache/chromium-temp-cookies",
+        )
         if os.environ.get("CI"):
             self.config.llm_chat = False
+            self.config.llm_check = False
+            self.config.query_token = False
+            self.config.always_token = False
+        self.check_network()
+        self.wheels = self.load_state()
         if self.config.llm_chat or self.config.llm_check:
             self.llm = LLM()
 
@@ -51,7 +104,9 @@ class ZhiPinBase(Base):
         r.raise_for_status()
 
     def iterate_query_parameters(self):
-        if not self.config.query_token:
+        if (not self.config.query_token) or (
+            self.config.query_token and self.parser.parse_args().extra_query
+        ):
             self.config.query_list.extend(self.config.extra_query_list)
         for city in self.config.query_city_list:
             if city in self.wheels[0]:
@@ -432,10 +487,34 @@ class ZhiPinBase(Base):
         return "立即" in startchat_text
 
     def check_offline(self, description_text, city_text) -> bool:
-        if self.config.offline_interview:
+        if (
+            self.config.offline_interview
+            and description_text
+            and city_text
+            and isinstance(self.config.offline_word_list, Iterable)
+        ):
             if any(item in description_text for item in self.config.offline_word_list):
                 return any(item in city_text for item in self.config.offline_city_list)
         return True
+
+    def check_block_list(self, data: dict) -> Optional[str]:
+        """检查字典中的值是否在相应的块列表中"""
+        for key, value in data.items():
+            if value:
+                if hasattr(value, "lower"):
+                    value = value.lower()
+                block_list = getattr(self.config, key + "_block_list", [])
+                for item in block_list:
+                    if item in value:
+                        print(
+                            json.dumps(
+                                {"检查字段": key, "字段": value, "包含": item},
+                                ensure_ascii=False,
+                                indent=4,
+                            )
+                        )
+                        return key
+        return None
 
     def save_state(self, wheels):
         with open(
@@ -456,3 +535,7 @@ class ZhiPinBase(Base):
         except (FileNotFoundError, json.decoder.JSONDecodeError) as e:
             self.handle_exception(e)
             return [[], [], [], 0]
+
+    @logger.catch
+    def handle_exception(self, exception):
+        raise exception

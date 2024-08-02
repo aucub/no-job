@@ -1,19 +1,20 @@
-import argparse
-import copy
 import os
+import sys
+import cv2
+import copy
+import time
+import arrow
 import random
 import shutil
 import socket
-import sys
 import atexit
-import time
-import cv2
-import arrow
 import asyncio
 from captcha import cracker
-from zhipin_base import ZhiPinBase, VerifyException
 from jd import JD, Level
+from zhipin_base import ZhiPinBase, VerifyException
 from DrissionPage import ChromiumPage, ChromiumOptions, SessionOptions, WebPage
+from collections.abc import Iterable
+from json.decoder import JSONDecodeError
 from DrissionPage.common import Settings, wait_until
 from DrissionPage.errors import (
     ElementNotFoundError,
@@ -22,8 +23,6 @@ from DrissionPage.errors import (
     WaitTimeoutError,
     WrongURLError,
 )
-from collections.abc import Iterable
-from json.decoder import JSONDecodeError
 
 Settings.raise_when_ele_not_found = True
 
@@ -35,27 +34,13 @@ class ZhiPinDrissionPage(ZhiPinBase):
             return s.getsockname()[1]
 
     def __init__(self):
-        parser = argparse.ArgumentParser()
-        parser.add_argument(
-            "--communicate",
-            action="store_true",
-            help="Enable communicate option",
-        )
-        user_cache_directory = os.path.expanduser("~") + "/.cache/"
-        parser.add_argument(
-            "-p",
-            "--data_path",
-            help="Data path",
-            default=user_cache_directory + "chromium-temp-cookies",
-        )
-        self.args = parser.parse_args()
         ZhiPinBase.__init__(self)
         atexit.register(self.cleanup_drission_page)
         self.cookies_co = (
             ChromiumOptions(read_file=False)
             .set_timeouts(self.config.timeout)
             .set_retry(self.config.max_retries)
-            .set_paths(user_data_path=self.args.data_path)
+            .set_paths(user_data_path=self.parser.parse_args().data_path)
             .set_pref("credentials_enable_service", False)
             .set_pref("enable_do_not_track", True)
             .set_pref("webrtc.ip_handling_policy", "disable_non_proxied_udp")
@@ -98,7 +83,7 @@ class ZhiPinDrissionPage(ZhiPinBase):
             copy.deepcopy(self.cookies_co)
             .set_paths(
                 local_port=self.find_free_port(),
-                user_data_path=user_cache_directory + "chromium-temp",
+                user_data_path=os.path.expanduser("~") + "/.cache/chromium-temp",
             )
             .incognito()
         )
@@ -107,7 +92,10 @@ class ZhiPinDrissionPage(ZhiPinBase):
             .set_timeout(self.config.timeout)
             .set_retry(self.config.max_retries)
         )
-        if hasattr(self.args, "communicate") and self.args.communicate:
+        if (
+            hasattr(self.parser.parse_args(), "communicate")
+            and self.parser.parse_args().communicate
+        ):
             self.config.query_token = True
             self.config.always_token = True
         if self.config.always_token:
@@ -118,6 +106,7 @@ class ZhiPinDrissionPage(ZhiPinBase):
                 timeout=self.config.timeout,
             )
             self.switch_page(True)
+            self.set_blocked_urls()
             self.page.set.auto_handle_alert(accept=False, all_tabs=True)
             if self.config.always_token:
                 self.page.clear_cache(cookies=False)
@@ -128,18 +117,12 @@ class ZhiPinDrissionPage(ZhiPinBase):
             if self.proxy:
                 self.co.set_proxy(self.proxy)
                 self.so.set_proxies(self.proxy, self.proxy)
-            if os.environ.get("CI"):
-                self.co.set_argument("--disable-gpu").set_argument(
-                    "--disable-software-rasterizer"
-                ).set_argument("--dns-prefetch-disable").set_argument(
-                    "--disable-browser-side-navigation"
-                ).remove_extensions().ignore_certificate_errors()
             self.original_page = WebPage("d", self.config.timeout, self.co, self.so)
             self.switch_page(False)
             self.page.set.auto_handle_alert(accept=False, all_tabs=True)
             self.set_blocked_urls()
             self.check_network_drission_page()
-        if self.args.communicate:
+        if self.parser.parse_args().communicate:
             self.test_communicate()
         else:
             self.test_query()
@@ -364,7 +347,7 @@ class ZhiPinDrissionPage(ZhiPinBase):
         while "safe/verify-slider" in current_url and captcha_result is False:
             try:
                 captcha_result = self.captcha()
-                self.page.get(self.URL1)
+                self.page.get(self.URL1 + "测试")
                 self.page.wait.eles_loaded(
                     locators=[
                         ".job-card-wrapper",
@@ -386,7 +369,7 @@ class ZhiPinDrissionPage(ZhiPinBase):
                 WaitTimeoutError,
             ) as e:
                 self.handle_exception(e)
-                self.page.get(self.URL1)
+                self.page.get(self.URL1 + "测试")
         if "403.html" in current_url or "error.html" in current_url:
             self.page.get_screenshot(path="tmp", name="error.jpg", full_page=True)
             sys.exit("403或错误")
@@ -483,7 +466,7 @@ class ZhiPinDrissionPage(ZhiPinBase):
         try:
             self.page.get(
                 self.URL16 + self.get_securityId(url),
-                proxies=self.proxies,
+                proxies={"http": self.proxy, "https": self.proxy},
             )
             if not self.parse_detail(self.page.raw_data):
                 return None
