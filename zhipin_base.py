@@ -164,10 +164,10 @@ class ZhiPinBase:
         jd = JD()
         jd.id = job.get("encryptJobId")
         jd.communicated = job.get("contact", False)
-        row = self.get_jd_unknown(jd.id)
+        row = self.get_jd_skip(jd.id)
         if row is None:
             return
-        else:
+        elif jd.id == row.id:
             jd = row
         jd.url = f"{self.URL8}{jd.id}{self.URL9}"
         jd.name = job.get("jobName")
@@ -316,7 +316,7 @@ class ZhiPinBase:
                     JD.reconnect()
             print(jd.__data__)
 
-    def get_jd_unknown(self, id) -> JD:
+    def get_jd_skip(self, id) -> JD:
         if self.config.skip_known and self.check_jd_known(id):
             return None
         row = self.get_jd(id)

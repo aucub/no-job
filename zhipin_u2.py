@@ -1,4 +1,3 @@
-import argparse
 import json
 import re
 import time
@@ -31,21 +30,19 @@ class ZhiPinU2(ZhiPinBase):
         self.d.swipe(0.05, 0.43, 0.91, 0.45)
 
     def __init__(self):
-        parser = argparse.ArgumentParser()
-        parser.add_argument(
+        self.parser.add_argument(
             "-m",
             "--mode",
             help="Query mode",
             default="query",
         )
-        self.args = parser.parse_args()
         ZhiPinBase.__init__(self)
         self.d = u2.connect()
         self.d.implicitly_wait(self.config.large_sleep)
         self.d.set_input_ime()
-        if self.args.mode == "query":
+        if self.parser.parse_args().mode == "query":
             self.test_query()
-        elif self.args.mode == "seen":
+        elif self.parser.parse_args().mode == "seen":
             self.test_seen()
 
     def start_app(self):
@@ -130,10 +127,10 @@ class ZhiPinU2(ZhiPinBase):
         jd.id = self.get_encryptJobId(url)
         jd.url = self.URL8 + jd.id + self.URL9
         jd.communicated = self.d(text="继续沟通").exists()
-        row = self.get_jd_unknown(jd.id)
+        row = self.get_jd_skip(jd.id)
         if row is None:
             return jd.id
-        else:
+        elif jd.id == row.id:
             jd = row
         jd.city = (
             self.d(resourceId="com.hpbr.bosszhipin:id/tv_required_location")
@@ -199,7 +196,7 @@ class ZhiPinU2(ZhiPinBase):
         jd.scale = tv_com_info[-2].strip()
         jd.industry = tv_com_info[-1].strip()
         jd.level = self.check_jd(jd)
-        self.save_jd(jd)
+        self.executor.submit(self.save_jd, jd)
         return jd.id
 
     def execute_query_jobs(self, city, query, salary):
@@ -227,20 +224,18 @@ class ZhiPinU2(ZhiPinBase):
         tab_labels[5].click()
         self.d(resourceId="com.hpbr.bosszhipin:id/btn_confirm").wait()
         try:
+            self.config.query_label_list_ui.insert(0, "不限")
             for label in self.config.query_label_list_ui:
                 if Direction.UP.value in label:
                     self.to_up()
                     time.sleep(self.config.small_sleep_ui)
                     continue
-                self.d(text=label).click()
+                self.d(text=label).click(timeout=self.config.small_sleep)
                 time.sleep(self.config.small_sleep_ui / 4)
             self.to_down()
             time.sleep(self.config.small_sleep_ui)
             self.d(text=salary).click()
             time.sleep(self.config.small_sleep_ui)
-            for degree in self.config.query_degree_list_ui:
-                self.d(text=degree).click()
-                time.sleep(self.config.small_sleep_ui / 4)
             self.d(resourceId="com.hpbr.bosszhipin:id/btn_confirm").click()
         except UiObjectNotFoundError as e:
             self.d(resourceId="com.hpbr.bosszhipin:id/iv_back").click()

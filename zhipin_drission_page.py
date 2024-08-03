@@ -295,10 +295,10 @@ class ZhiPinDrissionPage(ZhiPinBase):
                 jd.communicated = not self.contactable(job_info_html)
                 url = element.ele("css:.job-card-left").property("href")
                 jd.id = self.get_encryptJobId(url)
-                row = self.get_jd_unknown(jd.id)
+                row = self.get_jd_skip(jd.id)
                 if row is None:
                     continue
-                else:
+                elif jd.id == row.id:
                     jd = row
                 jd.url = url.split("&securityId")[0]
                 jd.name = element.ele("css:.job-name").text
