@@ -33,7 +33,7 @@ class ZhiPinU2(ZhiPinBase):
         self.parser.add_argument(
             "-m",
             "--mode",
-            help="Query mode",
+            help="Test mode",
             default="query",
         )
         ZhiPinBase.__init__(self)

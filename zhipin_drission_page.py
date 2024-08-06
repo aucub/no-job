@@ -107,7 +107,6 @@ class ZhiPinDrissionPage(ZhiPinBase):
             )
             self.switch_page(True)
             self.set_blocked_urls()
-            self.page.set.auto_handle_alert(accept=False, all_tabs=True)
             if self.config.always_token:
                 self.page.clear_cache(cookies=False)
             self.login()
@@ -119,7 +118,6 @@ class ZhiPinDrissionPage(ZhiPinBase):
                 self.so.set_proxies(self.proxy, self.proxy)
             self.original_page = WebPage("d", self.config.timeout, self.co, self.so)
             self.switch_page(False)
-            self.page.set.auto_handle_alert(accept=False, all_tabs=True)
             self.set_blocked_urls()
             self.check_network_drission_page()
         if self.parser.parse_args().communicate:
@@ -223,16 +221,21 @@ class ZhiPinDrissionPage(ZhiPinBase):
                 self.handle_exception(e)
         self.page.set.load_mode.none()
         self.page.listen.start("wapi/zpgeek/search/joblist")
-        self.page.get(
-            self.URL1
-            + query
-            + self.URL7
-            + city
-            + self.URL2
-            + salary
-            + self.URL3
-            + str(page)
-        )
+        if self.URL1 in self.page.url and (self.URL3 + str(page - 1)) in self.page.url:
+            arrow_right = self.page.ele(".ui-icon-arrow-right")
+            if arrow_right.states.is_clickable:
+                arrow_right.click()
+        else:
+            self.page.get(
+                self.URL1
+                + query
+                + self.URL7
+                + city
+                + self.URL2
+                + salary
+                + self.URL3
+                + str(page)
+            )
         listen_result = self.page.listen.wait(
             timeout=self.config.large_sleep, raise_err=False
         )
@@ -266,8 +269,6 @@ class ZhiPinDrissionPage(ZhiPinBase):
         if "没有找到相关职位" in element_list[0].text:
             self.page_count = page - 1
             return []
-        self.page.set.scroll.smooth(on_off=False)
-        self.page.scroll.to_bottom()
         if page == 1:
             try:
                 options_pages = self.page.ele(
