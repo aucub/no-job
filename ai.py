@@ -7,8 +7,6 @@ from portkey_ai import Portkey
 
 
 class LLM:
-    default_greet = "您好，不知道这个岗位是否还有在招人，我仔细查看了您发布的职位信息，觉得自己比较适合，希望能得到您的回复"
-
     def __init__(self) -> None:
         load_dotenv()
         os.environ["all_proxy"] = ""
@@ -74,13 +72,13 @@ class LLM:
         greet = self.send(prompt)
         if greet:
             greet = greet.replace("\n", "").replace("  ", "")
-        return greet or self.default_greet
+        return greet
 
 
 if __name__ == "__main__":
     jd = JD()
-    chat = LLM()
+    llm = LLM()
     jd.id = "test"
     jd.name = "测试"
     jd.description = "测试"
-    print(chat.generate_greet(jd))
+    print(llm.generate_greet(jd))

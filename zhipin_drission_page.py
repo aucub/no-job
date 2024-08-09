@@ -549,17 +549,20 @@ class ZhiPinDrissionPage(ZhiPinBase):
         self.executor.submit(self.save_jd, jd)
         jd.description = description
         time.sleep(self.config.sleep)
-        if chat_box and self.config.llm_chat:
+        if chat_box:
             try:
-                greet = self.llm.default_greet
+                greet = self.config.default_greet
                 if "chat" not in self.page.url and redirect_url:
                     self.page.get(f"{self.URL14[:-1]}{redirect_url}")
                 if self.config.llm_chat:
-                    greet = self.llm.generate_greet(self.config.resume, jd)
+                    greet = (
+                        self.llm.generate_greet(self.config.resume, jd)
+                        or self.config.default_greet
+                    )
                 self.send_greet_to_chat_box(greet)
             except ElementNotFoundError as e:
                 self.handle_exception(e)
-            return
+                return
         time.sleep(self.config.sleep)
         self.check_dialog()
 

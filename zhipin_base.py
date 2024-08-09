@@ -86,8 +86,6 @@ class ZhiPinBase:
             default=os.path.expanduser("~") + "/.cache/chromium-temp-cookies",
         )
         if os.environ.get("CI"):
-            self.config.llm_chat = False
-            self.config.llm_check = False
             self.config.query_token = False
             self.config.always_token = False
         self.check_network()

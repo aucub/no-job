@@ -20,8 +20,9 @@ class Config:
     small_sleep_ui: float = 1.0
     large_sleep: float = 7.0
     max_retries: int = 3
-    llm_chat: bool = False
     skip_known: bool = False
+    llm_chat: bool = False
+    default_greet = "您好，不知道这个岗位是否还有在招人，我仔细查看了您发布的职位信息，觉得自己比较适合，希望能得到您的回复"
     llm_check: bool = False
     llm_check_prompt: str = "我希望你充当求职者的招聘信息检查助手，你将检查职位描述的质量。请仅提供“true”或“false结果，无需解释。"
     resume: str = ""
